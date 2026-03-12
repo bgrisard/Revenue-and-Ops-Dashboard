@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Revenue &amp; Operations Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f4f5f8;color:#111827;min-height:100vh}
+:root{
+  --teal:#0ea5e9;--amber:#f59e0b;--red:#ef4444;--blue:#1e40af;
+  --green:#16a34a;--bg:#f4f5f8;--card:#fff;--border:#e5e7eb;
+  --thead:#1e293b;--text:#111827;--muted:#6b7280;--light:#f3f4f6;
+}
+#sticky-top{position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+#header{background:#fff;border-bottom:1px solid var(--border);padding:14px 28px;display:flex;justify-content:space-between;align-items:center}
+#header h1{font-size:18px;font-weight:700;letter-spacing:-.4px;color:#111827}
+#header-right{display:flex;gap:12px;align-items:center}
+#refresh-time{font-size:10px;color:var(--muted);font-family:'Inter',monospace;letter-spacing:.3px}
+#btn-refresh{background:#111827;border:none;color:#fff;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.5px;font-family:'Inter',sans-serif}
+#btn-refresh:hover{background:#374151}
+#filterbar{background:#fff;border-bottom:1px solid var(--border);padding:10px 28px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.fb-group{display:flex;flex-direction:column;gap:4px}
+.fb-label{font-size:9px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.mode-toggle{display:flex;background:var(--light);border:1px solid var(--border);border-radius:999px;overflow:hidden;padding:3px;gap:2px}
+.mode-btn{padding:5px 14px;cursor:pointer;font-size:11px;font-weight:600;background:transparent;color:var(--muted);border:none;outline:none;font-family:'Inter',sans-serif;border-radius:999px;transition:background .15s,color .15s}
+.mode-btn.active{background:#111827;color:#fff}
+select.fb-select{background:#fff;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;outline:none;min-width:135px;font-family:'Inter',sans-serif}
+#period-desc{margin-left:auto;font-size:10px;color:var(--muted);font-family:'Inter',monospace;text-align:right;line-height:1.7;letter-spacing:.3px}
+#period-desc .pd-hdr{font-size:9px;letter-spacing:1px;text-transform:uppercase;opacity:.55}
+#tabbar{background:#fff;padding:0 28px;border-bottom:1px solid var(--border);display:flex}
+.tab-btn{padding:12px 18px;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;outline:none;font-family:'Inter',sans-serif;transition:color .15s,border-color .15s}
+.tab-btn.active{color:#111827;border-bottom-color:#111827}
+#content{padding:22px 28px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;gap:14px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top:3px solid #111827;border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+#loading p{font-size:13px;color:var(--muted);letter-spacing:.5px}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.mt18{margin-top:18px}
+.sec-lbl{font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+#kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 20px;flex:1;min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.kpi-lbl{font-size:10px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-size:26px;font-weight:700;color:var(--text);line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.kpi-sub{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.kpi-sub-txt{font-size:11px;color:var(--muted)}
+.pill{font-size:10px;font-weight:600;border-radius:999px;padding:2px 9px}
+.pg{color:#15803d;background:#dcfce7}
+.pr{color:#b91c1c;background:#fee2e2}
+.pm{color:var(--muted);background:#f3f4f6}
+.kpi-yoy{background:linear-gradient(135deg,#f0f4ff,#f0fdf4);border-color:#e0e7ff}
+.kpi-yoy-note{margin-top:8px;font-size:11px;color:var(--muted)}
+.chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px}
+.chart-wrap{position:relative;height:220px}
+.chart-wrap-lg{position:relative;height:300px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:10px 14px;color:#fff;background:var(--thead);font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap}
+thead th.tl{text-align:left}thead th.tr{text-align:right}
+tbody td{padding:10px 14px;border-bottom:1px solid #f3f4f6;white-space:nowrap}
+tbody td.tl{text-align:left;font-weight:500}tbody td.tr{text-align:right;font-family:'Inter',monospace;font-size:12px;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:#f9fafb}
+.cb{color:#1e40af}.ct{color:#0369a1}.cr{color:#dc2626}.ca{color:#d97706}.cm{color:var(--muted)}.cg{color:#15803d}
+.ops-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}
+.ops-chart-wrap{position:relative;height:160px}
+.inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ds-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.ds-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ds-title{font-size:13px;font-weight:600;color:var(--text)}
+.ds-badge{font-size:10px;border-radius:999px;padding:2px 10px;font-family:'Inter',monospace}
+.ds-ok{background:#dcfce7;color:#15803d}.ds-err{background:#fee2e2;color:#dc2626}
+.ds-cols{display:flex;flex-wrap:wrap;gap:5px}
+.ds-col{font-size:10px;background:var(--light);border:1px solid var(--border);border-radius:5px;padding:2px 7px;color:var(--muted);font-family:'Inter',monospace}
+.ds-errmsg{font-size:11px;color:#dc2626}
+.join-card{background:var(--light);border-radius:12px;padding:18px 22px;grid-column:1/-1;border:1px solid var(--border)}
+.no-data{padding:16px;font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+
+<div id="sticky-top">
+<div id="header">
+  <h1>Revenue &amp; Operations Dashboard</h1>
+  <div id="header-right">
+    <span id="refresh-time"></span>
+    <button id="btn-refresh">REFRESH</button>
+  </div>
+</div>
+
+<div id="filterbar">
+  <div class="fb-group" id="fb-period-mode">
+    <span class="fb-label">Period Mode</span>
+    <div class="mode-toggle">
+      <button class="mode-btn" data-mode="ytd">YTD</button>
+      <button class="mode-btn" data-mode="booked">Booked to Date</button>
+      <button class="mode-btn active" data-mode="total">Total Bookings</button>
+    </div>
+  </div>
+  <div class="fb-group">
+    <span class="fb-label">Trip Type</span>
+    <select id="sel-type" class="fb-select"><option value="all">All Trip Types</option></select>
+  </div>
+  <div class="fb-group">
+    <span class="fb-label">Location</span>
+    <select id="sel-loc" class="fb-select"><option value="all">All Locations</option></select>
+  </div>
+  <div id="period-desc">
+    <div class="pd-hdr">Comparison Period</div>
+    <div id="period-text">—</div>
+  </div>
+</div>
+
+<div id="tabbar">
+  <button class="tab-btn active" data-tab="revenue">Revenue &amp; Trips</button>
+  <button class="tab-btn" data-tab="operations">Operations</button>
+  <button class="tab-btn" data-tab="data">Data Inspector</button>
+</div>
+</div><!-- /sticky-top -->
+
+<div id="content">
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loading-msg">LOADING DATA SOURCES…</p>
+    <p id="loading-detail" style="font-size:11px;color:#9aa8c0;margin-top:4px;font-family:'Inter',monospace"></p>
+    <div id="load-log" style="margin-top:16px;font-size:10px;font-family:'Inter',monospace;color:#6b7a99;max-width:500px;text-align:left;line-height:1.8"></div>
+  </div>
+
+  <!-- REVENUE TAB -->
+  <div id="tab-revenue" class="tab-panel">
+    <div id="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-lbl" id="kl-rev">Current Revenue</div>
+        <div class="kpi-val" id="kv-rev">—</div>
+        <div class="kpi-sub"><span id="kp-rev"></span><span class="kpi-sub-txt" id="ks-rev"></span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-lbl" id="kl-trips">Current Trips</div>
+        <div class="kpi-val" id="kv-trips">—</div>
+        <div class="kpi-sub"><span id="kp-trips"></span><span class="kpi-sub-txt" id="ks-trips"></span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-lbl">Avg Revenue / Trip</div>
+        <div class="kpi-val" id="kv-avg">—</div>
+        <div class="kpi-sub"><span id="kp-avg"></span><span class="kpi-sub-txt" id="ks-avg"></span></div>
+      </div>
+      <div class="kpi-card kpi-yoy">
+        <div class="kpi-lbl">YoY Revenue &#916;</div>
+        <div class="kpi-val" id="kv-yoy">—</div>
+        <div class="kpi-yoy-note" id="kn-yoy"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:3fr 2fr;gap:18px;align-items:start">
+      <div class="card">
+        <div class="sec-lbl" id="lbl-monthly">Monthly Revenue</div>
+        <div class="chart-wrap chart-wrap-lg"><canvas id="chart-monthly"></canvas></div>
+        <div style="margin-top:18px" id="tbl-monthly-wrap"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="background:var(--thead);padding:11px 18px">
+            <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Trip Type</div>
+          </div>
+          <div class="tbl-wrap" id="tbl-type"></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="background:var(--thead);padding:11px 18px">
+            <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Location</div>
+          </div>
+          <div class="tbl-wrap" id="tbl-loc"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPERATIONS TAB -->
+  <div id="tab-operations" class="tab-panel">
+    <!-- Filter bar -->
+    <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px;flex-wrap:wrap">
+      <div class="fb-group">
+        <span class="fb-label">Fleet Group</span>
+        <select id="sel-fleet" class="fb-select"><option value="all">All Fleet Groups</option></select>
+      </div>
+      <div class="fb-group">
+        <span class="fb-label">Trend Metric</span>
+        <select id="sel-ops-metric" class="fb-select">
+          <option value="rpm">Revenue / Mile</option>
+          <option value="fpm">Fuel Cost / Mile</option>
+          <option value="spm">Maint. Cost / Mile</option>
+          <option value="rpd">Revenue / Bus Day</option>
+          <option value="fpd">Fuel Cost / Bus Day</option>
+          <option value="spd">Maint. Cost / Bus Day</option>
+        </select>
+      </div>
+      <span style="font-size:10px;color:var(--muted);padding-bottom:10px">Bus Day = vehicle used &#8805; 5 hrs on a single calendar day (partial days pro-rated)</span>
+    </div>
+
+    <!-- KPI cards at top with headers -->
+    <div style="margin-bottom:6px;font-size:10px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Per Mile</div>
+    <div id="ops-kpi-mile" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"></div>
+    <div style="margin-bottom:6px;font-size:10px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Per Bus Day</div>
+    <div id="ops-kpi-day" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px"></div>
+
+    <!-- Side-by-side tables -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+      <div style="background:#fff;border:2px solid #254B71;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(37,75,113,.10)">
+        <div style="background:var(--thead);padding:12px 20px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#fff;text-transform:uppercase">Per Mile Metrics</div>
+        </div>
+        <div class="tbl-wrap" id="tbl-permile"></div>
+      </div>
+      <div style="background:#fff;border:2px solid #3a95a8;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(58,149,168,.10)">
+        <div style="background:var(--thead);padding:12px 20px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#fff;text-transform:uppercase">Per Bus Day Metrics</div>
+        </div>
+        <div class="tbl-wrap" id="tbl-perday"></div>
+      </div>
+    </div>
+
+    <!-- Monthly trend chart — each year a line -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sec-lbl" id="lbl-ops-trend">Monthly Trend — Revenue / Mile</div>
+      <div style="position:relative;height:300px"><canvas id="chart-ops-trend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DATA INSPECTOR TAB -->
+  <div id="tab-data" class="tab-panel">
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <button id="btn-conntest" style="background:#7c3aed;border:none;color:#fff;border-radius:7px;padding:8px 16px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:1px;font-family:'Inter',sans-serif">RUN CONNECTION TEST</button>
+      <span style="font-size:11px;color:#6b7a99">Tests each URL with each proxy — open browser console (F12) for full details</span>
+    </div>
+    <div id="conn-test-results" style="display:none;margin-bottom:18px"></div>
+    <div class="inspector-grid" id="inspector-grid"></div>
+  </div>
+
+</div>
+
+<script>
+// ── URLS ─────────────────────────────────────────────────────
+var URLS = {
+  bookings:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQh-BhNlFOUUBR8nc1wWuNGXCswEfB6fppsaS2TT9Z4l2scrhL6BOAEv9b1lxHx0dUd-Pi-XF7T_LdU/pub?output=csv",
+  fleet:       "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHD26jPJzjg3Xv4Hr9eZrE6ReeCV4G8W2PosDsAE7utoWqGqLVGem3EX1jf9XuSzdcadDXoAraDR0K/pub?output=csv",
+  fuel:        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7jMmhDP1xcT-DzoO43ICQL4BaggGAkJsTMnHioBVGnpaXqYwchtgemy4FQGwe57PMLTyUG8ul7ogQ/pub?output=csv",
+  service:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0JSwcqFFb1AUVuIZMm8gl6Pt9kbF6PeXyFfbDDUd9s2mi-AyFSvwoyQ0xbBNw88N5yxpSeEGzvUe9/pub?output=csv",
+  charter:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCYObRTPv7DSxgi1EO-M3E5K30OaNIjnHo2nwk2iZP4F8TqeU9gnteL3VGmBnaiH7MZk7Jv5iM-7a7/pub?output=csv",
+  utilization: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQAlE0lDr93uwYjyn08VFA4D8GfIN6CFEnszHZgvcU7sJOtNrOzVqObUlBEQgspnJetALrUSd-p4S1k/pub?output=csv",
+  plan:        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQMeZ3UuV8Ldh8FfqRr3wj6FUFWqUdmOrr6xWBV0_1vHS5SzE2fiKHd9OomA8MICitLyccEPWprndut/pub?output=csv"
+};
+
+// ── STATE ────────────────────────────────────────────────────
+var DATA = { bookings:[], fleet:{}, fuel:[], service:[], charter:[], utilization:{}, plan:{} };
+var MODE = "total", TRIP_TYPE = "all", LOC = "all", FLEET_FILT = "all";
+var CHARTS = {};
+var TODAY = new Date();
+var CY = TODAY.getFullYear(), PY = CY - 1;
+var enrichedBk = [], enrichedCharter = [], enrichedFuel = [], enrichedService = [], enrichedUtil = [];
+
+// ── UTILS ────────────────────────────────────────────────────
+function scrub(s){ return String(s||"").toLowerCase().replace(/[\s_\-\/().#]/g,""); }
+
+function findKey(headers, cands) {
+  for (var i=0; i<cands.length; i++) {
+    var cc = scrub(cands[i]);
+    for (var j=0; j<headers.length; j++) {
+      var hc = scrub(headers[j]);
+      if (hc===cc || hc.indexOf(cc)!==-1 || cc.indexOf(hc)!==-1) return headers[j];
+    }
+  }
+  return null;
+}
+
+function gv(row, cands) {
+  var k = findKey(Object.keys(row), cands);
+  return k !== null ? row[k] : null;
+}
+
+function parseD(v) {
+  if (!v) return null;
+  var d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function parseMoney(v) {
+  if (v==null || v==="") return null;
+  var n = parseFloat(String(v).replace(/[$,\s%]/g,""));
+  return isNaN(n) ? null : n;
+}
+
+function fmt$(n, d) {
+  if (n==null) return "—";
+  d = d||0;
+  return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:d}).format(n);
+}
+function fmtN(n) { return n==null?"—":new Intl.NumberFormat("en-US").format(Math.round(n)); }
+function fmtPct(n) {
+  if (n==null || !isFinite(n)) return "—";
+  return (n>=0?"+":"")+n.toFixed(1)+"%";
+}
+function yoy(c,p) { return (p&&p!==0)?((c-p)/Math.abs(p))*100:null; }
+
+function pillHTML(chg,lbl){
+  var prefix=lbl?lbl+" ":"";
+  if(chg==null||!isFinite(chg)) return '<span class="pill pm">'+prefix+'—</span>';
+  return '<span class="pill '+(chg>=0?"pg":"pr")+'">'+prefix+fmtPct(chg)+'</span>';
+}
+function colorClass(v) {
+  if (v==null||!isFinite(v)) return "cm";
+  return v>0?"cg":v<0?"cr":"cm";
+}
+
+// ── FETCH CSV ─────────────────────────────────────────────────
+// Validates CSV: must have at least 2 rows of real data (not just a header row)
+function isValidCSV(txt, header) {
+  if (!txt || txt.trim().length < 15) return false;
+  var first = txt.trim().charAt(0);
+  if (first === "<" || first === "{" || first === "[") return false;
+  var result = Papa.parse(txt, { header: header, skipEmptyLines: true });
+  if (!result.data || result.data.length < 1) return false;
+  // For header:false, check that first row has at least 2 cells (not empty)
+  if (!header) {
+    var row0 = result.data[0];
+    if (!row0 || row0.length < 2) return false;
+    if (row0.every(function(c){ return !c || String(c).trim() === ""; })) return false;
+  }
+  return true;
+}
+
+function fetchCSV(url, header, cb) {
+  var shortLabel = url.split("PACX")[1] ? ("PACX"+url.split("PACX")[1]).slice(0,20) : url.slice(50,70);
+
+  // Proxy order: codetabs works for large files; allorigins as fallback
+  // corsproxy skipped — returns 413 on files > ~1MB
+  var proxies = [
+    { name:"codetabs",  url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
+    { name:"allorigins",url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) },
+    { name:"codetabs2", url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
+    { name:"direct",    url:url }
+  ];
+  var idx = 0;
+
+  function tryNext(retryDelay) {
+    if (idx >= proxies.length) {
+      console.error("All proxies failed for:", shortLabel);
+      cb(header ? [] : []);
+      return;
+    }
+    var proxy = proxies[idx++];
+    var delay = retryDelay || 0;
+    setTimeout(function() {
+      console.log("Trying " + proxy.name + " for " + shortLabel);
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", proxy.url, true);
+      xhr.timeout = 30000;
+      xhr.onload = function() {
+        var txt = xhr.responseText;
+        console.log(proxy.name, "status:", xhr.status, "length:", txt ? txt.length : 0, "first:", txt ? txt.trim().charAt(0) : "");
+        if (xhr.status === 429) {
+          // Rate limited — wait 3 seconds and retry same proxy
+          console.warn(proxy.name + " rate limited (429), waiting 3s then retrying...");
+          idx--; // rewind so we retry same proxy
+          tryNext(3000);
+        } else if (xhr.status >= 200 && xhr.status < 300 && isValidCSV(txt, header)) {
+          var result = Papa.parse(txt, { header: header, skipEmptyLines: true });
+          console.log("SUCCESS via " + proxy.name + ":", result.data.length, "rows for", shortLabel);
+          cb(result.data);
+        } else {
+          console.warn(proxy.name + " failed (status:" + xhr.status + "), trying next");
+          tryNext(0);
+        }
+      };
+      xhr.onerror = function() { console.warn(proxy.name + " network error"); tryNext(0); };
+      xhr.ontimeout = function() { console.warn(proxy.name + " timed out"); tryNext(0); };
+      xhr.send();
+    }, delay);
+  }
+
+  tryNext();
+}
+
+// ── PARSE FLEET ───────────────────────────────────────────────
+function parseFleet(raw) {
+  if (!raw || raw.length < 3) return {};
+  var yearRow = raw[0], monthRow = raw[1];
+  var MONTHS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  var cols = [];
+  for (var i=1; i<yearRow.length; i++) {
+    var yr = String(yearRow[i]||"").trim();
+    var moRaw = String(monthRow[i]||"").trim();
+    var mo = parseInt(moRaw);
+    if (isNaN(mo)) mo = MONTHS.indexOf(moRaw.toLowerCase().slice(0,3)) + 1;
+    cols.push({yr:yr, mo:mo});
+  }
+  var lookup = {};
+  for (var r=2; r<raw.length; r++) {
+    var row = raw[r];
+    var vid = String(row[0]||"").trim();
+    if (!vid) continue;
+    lookup[vid] = {};
+    for (var ci=0; ci<cols.length; ci++) {
+      var yr2 = cols[ci].yr, mo2 = cols[ci].mo;
+      if (!yr2 || mo2 < 1) continue;
+      lookup[vid][yr2+"-"+String(mo2).padStart(2,"0")] = String(row[ci+1]||"").trim();
+    }
+  }
+  return lookup;
+}
+
+// ── PARSE VEHICLE UTILIZATION (wide format, no header) ──────────
+// Row 0: fleet group per vehicle column
+// Row 1: vehicle ID per vehicle column
+// Col 0: calendar date
+// Values: hours worked that day by that vehicle
+function parseUtilization(raw) {
+  if (!raw || raw.length < 3) return {};
+  var groupRow = raw[0];   // Row 1 in sheet: fleet group
+  var vidRow   = raw[1];   // Row 2 in sheet: vehicle ID
+  // Build lookup: { vehicleId: { "YYYY-MM-DD": hoursDecimal } }
+  var lookup = {};
+  // Also store fleet group per vehicle
+  var vidGroups = {};
+  for (var c = 1; c < vidRow.length; c++) {
+    var vid = String(vidRow[c] || "").trim();
+    if (!vid) continue;
+    lookup[vid] = {};
+    vidGroups[vid] = String(groupRow[c] || "").trim();
+  }
+  for (var r = 2; r < raw.length; r++) {
+    var row = raw[r];
+    var dateRaw = String(row[0] || "").trim();
+    var dt = new Date(dateRaw);
+    if (isNaN(dt.getTime())) continue;
+    var dateKey = dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+    for (var c2 = 1; c2 < vidRow.length; c2++) {
+      var vid2 = String(vidRow[c2] || "").trim();
+      if (!vid2 || !lookup[vid2]) continue;
+      var hrs = parseFloat(String(row[c2] || "0").replace(/[^0-9.]/g,""));
+      if (!isNaN(hrs) && hrs > 0) lookup[vid2][dateKey] = hrs;
+    }
+  }
+  return { hours: lookup, groups: vidGroups };
+}
+
+function getGroup(vehicleId, date) {
+  if (!vehicleId || !date) return "Unknown";
+  var vid = String(vehicleId).trim();
+  var key = date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0");
+  return (DATA.fleet[vid] && DATA.fleet[vid][key]) || "Unknown";
+}
+
+// ── PARSE 2026 PLAN (wide, no header) ────────────────────────
+// Row 0 (raw[0]): col 0="", col 1=""(year), col 2=""(month), col 3+ = BookingBase or BookingType label
+// Row 1 (raw[1]): col 0="", col 1="Year", col 2="Month", col 3+ = Location or TripType value
+// Rows 2+: col 0=year, col 1=month_name, col 2+=revenue values
+// Returns:
+// {
+//   monthly: { "YYYY-MM": totalRevenue },               // sum of all columns for that month
+//   byType:  { tripType: { "YYYY-MM": revenue } },
+//   byLoc:   { location: { "YYYY-MM": revenue } },
+//   total:   { "YYYY-MM": totalRevenue }                // same as monthly
+// }
+function parsePlan(raw) {
+  if(!raw||raw.length<3) return {monthly:{},byType:{},byLoc:{},total:{}};
+  var categoryRow = raw[0]; // Row 1: "BookingBase" or "BookingType" per column
+  var labelRow    = raw[1]; // Row 2: actual name per column; "Total" = grand total column
+
+  // Find the index of the "Total" column by label
+  var totalColIdx = -1;
+  for(var ci=2; ci<labelRow.length; ci++){
+    if(String(labelRow[ci]||"").trim().toLowerCase()==="total"){
+      totalColIdx = ci; break;
+    }
+  }
+
+  var result = {monthly:{}, byType:{}, byLoc:{}, total:{}};
+  var MONTHS = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,
+                september:8,october:9,november:10,december:11,
+                jan:0,feb:1,mar:2,apr:3,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+
+  for(var r=2; r<raw.length; r++){
+    var row = raw[r];
+    var yr = parseInt(String(row[0]||"").trim());
+    var moRaw = String(row[1]||"").trim().toLowerCase();
+    var moIdx = MONTHS[moRaw] !== undefined ? MONTHS[moRaw]
+              : MONTHS[moRaw.substring(0,3)] !== undefined ? MONTHS[moRaw.substring(0,3)]
+              : (parseInt(moRaw)-1);
+    if(isNaN(yr)||isNaN(moIdx)||moIdx<0||moIdx>11) continue;
+    var ym = yr+"-"+String(moIdx+1).padStart(2,"0");
+
+    // Use the dedicated Total column for total — do NOT sum other columns
+    if(totalColIdx>=0){
+      var totVal = parseMoney(String(row[totalColIdx]||"0"));
+      if(!isNaN(totVal)) result.total[ym] = (result.total[ym]||0) + totVal;
+    }
+
+    // Parse segment columns (skip Total column)
+    for(var c=2; c<row.length; c++){
+      if(c===totalColIdx) continue; // skip Total column for segment breakdowns
+      var cat = String(categoryRow[c]||"").trim();
+      var lbl = String(labelRow[c]||"").trim();
+      var val = parseMoney(String(row[c]||"0"));
+      if(isNaN(val)||!lbl) continue;
+
+      result.monthly[ym] = (result.monthly[ym]||0) + val;
+
+      if(cat==="BookingType"||cat==="Trip Type"||cat==="TripType"){
+        if(!result.byType[lbl]) result.byType[lbl]={};
+        result.byType[lbl][ym] = (result.byType[lbl][ym]||0)+val;
+      } else {
+        if(!result.byLoc[lbl]) result.byLoc[lbl]={};
+        result.byLoc[lbl][ym] = (result.byLoc[lbl][ym]||0)+val;
+      }
+    }
+    // If no Total column found, fall back to summing segments
+    if(totalColIdx<0) result.total[ym] = result.monthly[ym]||0;
+  }
+  return result;
+}
+
+// ── PLAN LOOKUP HELPERS ───────────────────────────────────────
+// Get plan revenue for a given group and set of YYYY-MM keys
+function planRevForKeys(planMap, group, ymKeys) {
+  if(!planMap||!group) return 0;
+  var grpMap = planMap[group]||{};
+  return ymKeys.reduce(function(s,ym){ return s+(grpMap[ym]||0); },0);
+}
+// Get total plan revenue (all groups) for a set of YYYY-MM keys
+function planTotalForKeys(planTotal, ymKeys) {
+  if(!planTotal) return 0;
+  return ymKeys.reduce(function(s,ym){ return s+(planTotal[ym]||0); },0);
+}
+
+// ── PLAN CALCULATION CORE ────────────────────────────────────
+// FORMULAS (per month, then summed):
+//
+// Total Bookings:
+//   Plan = CY plan total for that month (raw, no scaling)
+//
+// Booked to Date:
+//   Plan_BTD_m = (PY_booked_m / PY_total_m) * CY_plan_m
+//   where PY_booked_m = PY revenue booked by (today's month/day) for month m
+//         PY_total_m  = PY full-year total for that same month
+//         CY_plan_m   = CY plan total for that month (from plan CSV Total column)
+//
+// YTD:
+//   Plan_YTD_m = (CY_ytd_m / CY_booked_m) * Plan_BTD_m
+//   where CY_ytd_m    = CY actual YTD revenue for month m
+//         CY_booked_m = CY booked-to-date revenue for month m
+//         Plan_BTD_m  = Booked-to-Date plan for month m (as above)
+
+// Build YYYY-MM keys for a given period mode (months in scope)
+// Note: always returns all 12 months for plan display purposes.
+// The planForMonth function handles future months by returning raw plan.
+function ymKeysForMode(yr) {
+  var keys=[];
+  for(var m=0;m<12;m++) keys.push(yr+"-"+String(m+1).padStart(2,"0"));
+  return keys;
+}
+
+// Pre-build all the monthly buckets needed for plan calculations
+// Returns an object with per-month arrays indexed 0-11
+function buildPlanBuckets(typeFilter, locFilter) {
+  var buckets = {
+    pyTotal:      Array(12).fill(0),  // PY full-year actuals per month
+    pyBooked:     Array(12).fill(0),  // PY booked-by-today actuals per month
+    cyYTD:        Array(12).fill(0),  // CY YTD actuals per month
+    cyBooked:     Array(12).fill(0),  // CY booked-to-date actuals per month
+    pyGrandTotal: 0,                  // PY full-year grand total (all months, denominator for BTD)
+    // group-level variants (keyed by group value)
+    pyTotalGrp:  {},
+    pyBookedGrp: {},
+    cyYTDGrp:    {},
+    cyBookedGrp: {}
+  };
+
+  var todayMo=TODAY.getMonth(), todayDay=TODAY.getDate();
+
+  enrichedBk.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    var yr=r._tripDate.getFullYear();
+    if(yr!==CY && yr!==PY) return;
+    var mo=r._tripDate.getMonth();
+    var day=r._tripDate.getDate();
+    var rev=r._revenue;
+
+    // Apply optional type/loc filters
+    var passFilter = (typeFilter==="all"||!typeFilter||r._type===typeFilter) &&
+                     (locFilter==="all"||!locFilter||r._loc===locFilter);
+
+    // YTD pass: trip date <= today (month+day)
+    var passYTD = (mo<todayMo)||(mo===todayMo&&day<=todayDay);
+
+    // Booked-to-date pass: booking date <= (same year, todayMo, todayDay)
+    var passBTD = false;
+    if(r._bookingDate){
+      var cutoff=new Date(yr, todayMo, todayDay);
+      passBTD = r._bookingDate<=cutoff;
+    }
+
+    if(yr===PY){
+      // PY total: all PY trips (full year, no date cutoff, no filter)
+      buckets.pyTotal[mo]+=rev;
+      buckets.pyGrandTotal+=rev;  // running grand total across all months
+      // PY booked: trips booked by (today month/day) in PY
+      if(passBTD) buckets.pyBooked[mo]+=rev;
+    }
+    if(yr===CY && passFilter){
+      // CY YTD
+      if(passYTD) buckets.cyYTD[mo]+=rev;
+      // CY booked-to-date
+      if(passBTD) buckets.cyBooked[mo]+=rev;
+    }
+  });
+
+  return buckets;
+}
+
+// Compute plan value for a single month index given pre-built buckets
+// planMo = raw plan value from CSV for that month
+function planForMonth(mo, planMo, buckets) {
+  if(!planMo) return null;
+  if(MODE==="total") return planMo;
+
+  // Denominator: PY total for this specific month
+  var pyTotal  = buckets.pyTotal[mo] || 0;
+  var pyBooked = buckets.pyBooked[mo] || 0;
+  var cyYTD    = buckets.cyYTD[mo]    || 0;
+  var cyBooked = buckets.cyBooked[mo] || 0;
+
+  // Step 1: Booked-to-Date plan = (PY_booked_m / PY_total_m) * CY_plan_m
+  var planBTD = pyTotal>0 ? (pyBooked/pyTotal)*planMo : planMo;
+
+  if(MODE==="booked") return planBTD;
+
+  // Step 2: YTD plan = (CY_ytd_m / CY_booked_m) * Plan_BTD_m
+  if(MODE==="ytd"){
+    if(cyBooked>0) return (cyYTD/cyBooked)*planBTD;
+    return planBTD;  // fallback: nothing booked CY yet
+  }
+
+  return planMo;
+}
+
+// Compute plan value per group for a single month
+// Uses group's PY booked share of PY grand total to split the plan
+function planForMonthGroup(mo, planMo, buckets, grpKey, groupKey) {
+  if(!planMo) return null;
+  if(MODE==="total"){
+    // Total mode: group share = PY group grand total / PY grand total
+    var pyGT = buckets.pyGrandTotal||0;
+    var pyGrpTotal = (buckets.pyTotalGrp[grpKey]||[]).reduce(function(s,v){return s+v;},0);
+    return pyGT>0 ? (pyGrpTotal/pyGT)*planMo : null;
+  }
+
+  // Denominator: PY total for this specific month
+  var pyTotalMo   = buckets.pyTotal[mo] || 0;
+  var pyBookedGrp = (buckets.pyBookedGrp[grpKey]||[])[mo] || 0;
+  var cyYTD       = (buckets.cyYTDGrp[grpKey]||[])[mo]    || 0;
+  var cyBooked    = (buckets.cyBookedGrp[grpKey]||[])[mo]  || 0;
+
+  // Step 1: Plan_BTD_group_m = (PY_booked_group_m / PY_total_m) * CY_plan_m
+  var planBTD = pyTotalMo>0 ? (pyBookedGrp/pyTotalMo)*planMo : null;
+  if(planBTD===null) return null;
+
+  if(MODE==="booked") return planBTD;
+
+  // Step 2: Plan_YTD_group_m = (CY_ytd_group_m / CY_booked_group_m) * Plan_BTD_group_m
+  if(MODE==="ytd"){
+    if(cyBooked>0) return (cyYTD/cyBooked)*planBTD;
+    return planBTD;
+  }
+  return planBTD;
+}
+
+// Build group-level buckets into the base buckets object
+function buildPlanBucketsWithGroups(typeFilter, locFilter, groupKey) {
+  var buckets = buildPlanBuckets(typeFilter, locFilter);
+  var todayMo=TODAY.getMonth(), todayDay=TODAY.getDate();
+
+  enrichedBk.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    var yr=r._tripDate.getFullYear();
+    if(yr!==CY && yr!==PY) return;
+    var mo=r._tripDate.getMonth();
+    var day=r._tripDate.getDate();
+    var rev=r._revenue;
+    var grpKey=r[groupKey]||"(unset)";
+
+    var passFilter = (typeFilter==="all"||!typeFilter||r._type===typeFilter) &&
+                     (locFilter==="all"||!locFilter||r._loc===locFilter);
+    var passYTD = (mo<todayMo)||(mo===todayMo&&day<=todayDay);
+    var passBTD = false;
+    if(r._bookingDate){
+      var cutoff=new Date(yr, todayMo, todayDay);
+      passBTD = r._bookingDate<=cutoff;
+    }
+
+    if(yr===PY){
+      if(!buckets.pyTotalGrp[grpKey]) buckets.pyTotalGrp[grpKey]=Array(12).fill(0);
+      buckets.pyTotalGrp[grpKey][mo]+=rev;
+      if(passBTD){
+        if(!buckets.pyBookedGrp[grpKey]) buckets.pyBookedGrp[grpKey]=Array(12).fill(0);
+        buckets.pyBookedGrp[grpKey][mo]+=rev;
+      }
+    }
+    if(yr===CY && passFilter){
+      if(passYTD){
+        if(!buckets.cyYTDGrp[grpKey]) buckets.cyYTDGrp[grpKey]=Array(12).fill(0);
+        buckets.cyYTDGrp[grpKey][mo]+=rev;
+      }
+      if(passBTD){
+        if(!buckets.cyBookedGrp[grpKey]) buckets.cyBookedGrp[grpKey]=Array(12).fill(0);
+        buckets.cyBookedGrp[grpKey][mo]+=rev;
+      }
+    }
+  });
+  return buckets;
+}
+
+// planAdjusted kept for backward compat (unused but may be referenced)
+function planAdjusted(pyMetric, pyTotal, cyPlanTotal) {
+  if(MODE==="total") return cyPlanTotal||null;
+  if(!pyTotal||pyTotal===0) return cyPlanTotal||null;
+  if(!cyPlanTotal) return null;
+  return (pyMetric / pyTotal) * cyPlanTotal;
+}
+
+// ── ENRICH ────────────────────────────────────────────────────
+function enrichAll() {
+  // ── Firm Bookings: drives Revenue & Trips tab ──
+  enrichedBk = DATA.bookings.map(function(r){
+    var tripDate    = parseD(r["StartDate"]);
+    var bookingDate = parseD(r["BookingDateCreated"]);
+    var revenue     = parseMoney(r["Total"]);
+    var hireId      = r["PrivateHireID"];
+    var type        = r["BookingType"];
+    var loc         = r["BookingBase"];
+    return Object.assign({},r,{_tripDate:tripDate,_bookingDate:bookingDate,_revenue:revenue,_hireId:hireId,_type:type,_loc:loc});
+  }).filter(function(r){ return r._tripDate||r._bookingDate; });
+
+  // ── Charter Revenue: drives miles + ops revenue ──
+  enrichedCharter = DATA.charter.map(function(r){
+    var vid      = r["VehicleID"];
+    var miles    = parseMoney(r["Mileage"]);
+    var revenue  = parseMoney(r["Total"]);
+    var tripDate = parseD(r["StartDateTime"]);
+    var grp      = (vid&&tripDate) ? getGroup(vid,tripDate) : "Unknown";
+    return Object.assign({},r,{_vid:vid,_miles:miles,_revenue:revenue,_date:tripDate,_grp:grp});
+  }).filter(function(r){ return r._vid; });
+
+  // ── Fuel History: drives fuel cost ──
+  enrichedFuel = DATA.fuel.map(function(r){
+    var vid  = r["Vehicle Name"];
+    var cost = parseMoney(r["Total (USD)"]);
+    var date = parseD(r["Date (Central Time (US & Canada))"]);
+    var grp  = (vid&&date) ? getGroup(vid,date) : "Unknown";
+    return Object.assign({},r,{_vid:vid,_cost:cost,_date:date,_grp:grp});
+  }).filter(function(r){ return r._vid; });
+
+  // ── Service History: drives maintenance cost ──
+  enrichedService = DATA.service.map(function(r){
+    var vid  = r["Vehicle Name"];
+    var cost = parseMoney(r["Subtotal (USD)"]);
+    var date = parseD(r["Started At"]);
+    var grp  = (vid&&date) ? getGroup(vid,date) : "Unknown";
+    return Object.assign({},r,{_vid:vid,_cost:cost,_date:date,_grp:grp});
+  }).filter(function(r){ return r._vid; });
+
+  // ── Join Charter → Bookings to get _type and _loc on charter rows ──
+  // Firm Bookings has PrivateHireID; Charter Revenue may also have PrivateHireID
+  var bkMap = {};
+  enrichedBk.forEach(function(r){
+    if(r._hireId) bkMap[String(r._hireId).trim()] = {_type:r._type, _loc:r._loc};
+  });
+  enrichedCharter = enrichedCharter.map(function(r){
+    var hireId = r["PrivateHireID"] || r["PrivateHireId"] || r["privatehireid"] || "";
+    hireId = String(hireId).trim();
+    var bk = hireId ? (bkMap[hireId]||{}) : {};
+    return Object.assign({}, r, {_hireId:hireId, _type:bk._type||null, _loc:bk._loc||null});
+  });
+
+  // ── Vehicle Utilization: drives Bus Days ──
+  // DATA.utilization = { hours: {vid: {"YYYY-MM-DD": hrs}}, groups: {vid: group} }
+  enrichedUtil = [];
+  var util = DATA.utilization;
+  if (util && util.hours) {
+    Object.keys(util.hours).forEach(function(vid){
+      var grp = (util.groups && util.groups[vid]) || getGroup(vid, TODAY) || "Unknown";
+      Object.keys(util.hours[vid]).forEach(function(dateKey){
+        var hrs = util.hours[vid][dateKey];
+        // Bus Day: >= 5 hrs = 1.0, < 5 hrs = hrs / 5
+        var busDayVal = hrs >= 5 ? 1.0 : hrs / 5;
+        enrichedUtil.push({ _vid:vid, _grp:grp, _dateKey:dateKey, _hours:hrs, _busDayVal:busDayVal });
+      });
+    });
+  }
+}
+
+// ── FILTER ────────────────────────────────────────────────────
+function filterBookings() {
+  var cStart=new Date(CY,0,1), cEnd=TODAY;
+  var pStart=new Date(PY,0,1), pEnd=new Date(PY,TODAY.getMonth(),TODAY.getDate());
+  var curr=[], prior=[];
+  for (var i=0; i<enrichedBk.length; i++) {
+    var r = enrichedBk[i];
+    if (TRIP_TYPE!=="all" && r._type!==TRIP_TYPE) continue;
+    if (LOC!=="all" && r._loc!==LOC) continue;
+    if (MODE==="ytd") {
+      var d = r._tripDate; if (!d) continue;
+      if (d>=cStart && d<=cEnd) curr.push(r);
+      if (d>=pStart && d<=pEnd) prior.push(r);
+    } else if (MODE==="booked") {
+      var bd=r._bookingDate, td=r._tripDate;
+      if (!bd||!td) continue;
+      var yr=td.getFullYear();
+      if (yr===CY && bd<=TODAY) curr.push(r);
+      if (yr===PY && bd<=pEnd) prior.push(r);
+    } else {
+      // Total Bookings: full calendar year, no date cutoff
+      var d2 = r._tripDate; if (!d2) continue;
+      if (d2.getFullYear()===CY) curr.push(r);
+      if (d2.getFullYear()===PY) prior.push(r);
+    }
+  }
+  return {curr:curr, prior:prior};
+}
+
+// ── DROPDOWNS ────────────────────────────────────────────────
+function populateDropdowns(opsData) {
+  var types=new Set(), locs=new Set();
+  enrichedBk.forEach(function(r){ if(r._type)types.add(r._type); if(r._loc)locs.add(r._loc); });
+
+  var selType=document.getElementById("sel-type");
+  selType.innerHTML='<option value="all">All Trip Types</option>';
+  Array.from(types).sort().forEach(function(t){ selType.innerHTML+='<option value="'+t+'">'+t+'</option>'; });
+  selType.value=TRIP_TYPE;
+
+  var selLoc=document.getElementById("sel-loc");
+  selLoc.innerHTML='<option value="all">All Locations</option>';
+  Array.from(locs).sort().forEach(function(l){ selLoc.innerHTML+='<option value="'+l+'">'+l+'</option>'; });
+  selLoc.value=LOC;
+
+  var selFleet=document.getElementById("sel-fleet");
+  selFleet.innerHTML='<option value="all">All Fleet Groups</option>';
+  opsData.forEach(function(d){ selFleet.innerHTML+='<option value="'+d.group+'">'+d.group+'</option>'; });
+  selFleet.value=FLEET_FILT;
+}
+
+// ── PLAN HELPERS ─────────────────────────────────────────────
+// Does a PY booking row pass the same date window as the current MODE?
+// Used to build the PY ratio for plan scaling — must match filterBookings() logic for PY.
+function pyRowPassesMode(r) {
+  if(MODE==="total") return true;
+  if(MODE==="ytd") {
+    var d=r._tripDate; if(!d) return false;
+    var mo=d.getMonth(), day=d.getDate();
+    var todayMo=TODAY.getMonth(), todayDay=TODAY.getDate();
+    return (mo<todayMo)||(mo===todayMo&&day<=todayDay);
+  }
+  if(MODE==="booked") {
+    var bd=r._bookingDate; if(!bd) return false;
+    var cutoff=new Date(PY, TODAY.getMonth(), TODAY.getDate());
+    return bd<=cutoff;
+  }
+  return true;
+}
+
+// ── KPIs ─────────────────────────────────────────────────────
+function computePlanKPI() {
+  if(!DATA.plan||!DATA.plan.total) return null;
+  var buckets = buildPlanBuckets(TRIP_TYPE, LOC);
+  var plan=0, hasAny=false;
+  for(var m=0; m<12; m++){
+    var ym=CY+"-"+String(m+1).padStart(2,"0");
+    var planMo=DATA.plan.total[ym]||0;
+    if(!planMo) continue;
+    var v = planForMonth(m, planMo, buckets);
+    if(v!=null){ plan+=v; hasAny=true; }
+  }
+  return hasAny ? plan : null;
+}
+
+function renderKPIs(curr, prior) {
+  function sum(arr){ return arr.reduce(function(a,r){ return a+(r._revenue||0); },0); }
+  function uniq(arr){ var s=new Set(); arr.forEach(function(r){ if(r._hireId)s.add(r._hireId); }); return s.size||arr.length; }
+  var cR=sum(curr),pR=sum(prior),cT=uniq(curr),pT=uniq(prior);
+  var planR=computePlanKPI();
+  var rChgPY=yoy(cR,pR), rChgPlan=yoy(cR,planR);
+  var tChg=yoy(cT,pT);
+  var avgR=cT?cR/cT:null, pAvgR=pT?pR/pT:null, avgChg=yoy(avgR,pAvgR);
+
+  document.getElementById("kl-rev").textContent=CY+" Revenue";
+  document.getElementById("kv-rev").textContent=fmt$(cR);
+  document.getElementById("kp-rev").innerHTML=
+    '<span style="margin-right:6px">'+pillHTML(rChgPY,'vs PY')+'</span>'+
+    (planR!=null ? pillHTML(rChgPlan,'vs Plan') : '');
+  document.getElementById("ks-rev").textContent="Plan: "+(planR!=null?fmt$(planR):"—")+" · PY: "+fmt$(pR);
+
+  document.getElementById("kl-trips").textContent=CY+" Trips";
+  document.getElementById("kv-trips").textContent=fmtN(cT);
+  document.getElementById("kp-trips").innerHTML=pillHTML(tChg);
+  document.getElementById("ks-trips").textContent="Prior: "+fmtN(pT);
+
+  document.getElementById("kv-avg").textContent=fmt$(avgR);
+  document.getElementById("kp-avg").innerHTML=pillHTML(avgChg);
+  document.getElementById("ks-avg").textContent="Prior: "+fmt$(pAvgR);
+
+  var yoyEl=document.getElementById("kv-yoy");
+  yoyEl.textContent=fmtPct(rChgPY);
+  yoyEl.style.color=(rChgPY==null||!isFinite(rChgPY))?"var(--muted)":rChgPY>=0?"var(--green)":"var(--red)";
+  document.getElementById("kn-yoy").textContent=rChgPY>=0?"▲ Ahead of prior period":"▼ Behind prior period";
+}
+
+// ── PERIOD DESC ───────────────────────────────────────────────
+function updatePeriodDesc() {
+  var d=TODAY.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  var pd=new Date(PY,TODAY.getMonth(),TODAY.getDate()).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  var txt=MODE==="ytd"?"Jan 1 \u2013 "+d+" vs Jan 1 \u2013 "+pd
+    :MODE==="booked"?CY+" booked by "+d+" vs "+PY+" booked by "+pd
+    :"Full year "+CY+" vs full year "+PY;
+  document.getElementById("period-text").textContent=txt;
+}
+
+// ── CHART UTILS ───────────────────────────────────────────────
+var TICK_STYLE = {color:"#6b7a99",font:{family:"Outfit",size:10}};
+var GRID_STYLE = {color:"#e2e5eb"};
+
+function destroyChart(id){ if(CHARTS[id]){ CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+// ── REVENUE BY YEAR ───────────────────────────────────────────
+function renderByYearChart(filteredRows) {
+  var rows = filteredRows || enrichedBk;
+  var m={};
+  rows.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    var yr=r._tripDate.getFullYear();
+    if(yr < 2024) return; // exclude years before 2024
+    if(!m[yr]) m[yr]={rev:0,trips:new Set()};
+    m[yr].rev+=r._revenue;
+    if(r._hireId) m[yr].trips.add(r._hireId);
+  });
+  var years=Object.keys(m).sort();
+  var data=years.map(function(yr,i){
+    return {year:yr, revenue:Math.round(m[yr].rev), chg:i>0?yoy(m[yr].rev,m[years[i-1]].rev):null};
+  });
+
+  var BIG_TICK = {color:"#6b7a99",font:{family:"Outfit",size:13}};
+  destroyChart("byyear");
+  var ctx=document.getElementById("chart-byyear").getContext("2d");
+  // Distinct color per year
+  var YEAR_COLORS = ["#3a95a8","#c97a1a","#254B71","#2e7d52","#c0392b","#7b6fa0"];
+  var barColors = data.map(function(d,i){ return YEAR_COLORS[i % YEAR_COLORS.length]; });
+
+  CHARTS["byyear"]=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:data.map(function(d){return d.year;}),
+      datasets:[{
+        label:"Revenue",
+        data:data.map(function(d){return d.revenue;}),
+        backgroundColor:barColors,
+        borderRadius:5
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:function(c){return "$"+c.parsed.y.toLocaleString();}}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:BIG_TICK},
+        y:{grid:GRID_STYLE,ticks:Object.assign({},BIG_TICK,{callback:function(v){return "$"+(v/1000).toFixed(0)+"k";}})}
+      }
+    }
+  });
+
+  document.getElementById("year-strip").innerHTML=data.map(function(d){
+    return '<div class="year-chip"><div class="yc-yr">'+d.year+'</div><div class="yc-val">$'+(d.revenue/1000).toFixed(0)+'k</div><div class="yc-chg '+colorClass(d.chg)+'">'+fmtPct(d.chg)+'</div></div>';
+  }).join("");
+}
+
+// ── MONTHLY REVENUE TABLE — 5 metrics ────────────────────────
+function renderMonthlyTable(filteredRows) {
+  var el = document.getElementById("tbl-monthly-wrap");
+  if(!el) return;
+  var MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var cy=Array(12).fill(0), py=Array(12).fill(0);
+  var allRows = filteredRows||enrichedBk;
+  allRows.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    var yr=r._tripDate.getFullYear(), mo=r._tripDate.getMonth();
+    if(yr===CY) cy[mo]+=r._revenue;
+    if(yr===PY) py[mo]+=r._revenue;
+  });
+
+  // Plan: computed per month using new two-step formula, then displayed
+  var plan=Array(12).fill(null);
+  if(DATA.plan&&DATA.plan.total){
+    var tblBuckets=buildPlanBuckets(TRIP_TYPE, LOC);
+    for(var m=0;m<12;m++){
+      var ym=CY+"-"+String(m+1).padStart(2,"0");
+      var planMo=DATA.plan.total[ym]||0;
+      if(planMo) plan[m]=planForMonth(m, planMo, tblBuckets);
+    }
+  }
+
+  var COL_CY="#253047", COL_PLAN="#1b4d2e", COL_PY="#4a3010";
+  var thead='<thead>'
+    +'<tr>'
+    +'<th class="tl" rowspan="2" style="vertical-align:middle">Month</th>'
+    +'<th class="tr" style="background:'+COL_CY+'">CY</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">Plan</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">CY vs Plan</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">PY</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">CY vs PY</th>'
+    +'</tr></thead>';
+
+  var totCY=0,totPY=0,totPlan=0;
+  var rows=MO.map(function(name,i){
+    var cyv=cy[i], pyv=py[i], plv=plan[i];
+    totCY+=cyv; totPY+=pyv; if(plv) totPlan+=plv;
+    var vsP=yoy(cyv,plv), vsY=yoy(cyv,pyv);
+    return '<tr>'
+      +'<td class="tl cb">'+name+'</td>'
+      +'<td class="tr" style="background:rgba(37,48,71,.04)">'+( cyv?fmt$(cyv):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(27,77,46,.04)">'+( plv!=null?fmt$(plv):"—")+'</td>'
+      +'<td class="tr '+colorClass(vsP)+'" style="background:rgba(27,77,46,.04)">'+(cyv||plv?fmtPct(vsP):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(74,48,16,.04)">'+( pyv?fmt$(pyv):"—")+'</td>'
+      +'<td class="tr '+colorClass(vsY)+'" style="background:rgba(74,48,16,.04)">'+(cyv||pyv?fmtPct(vsY):"—")+'</td>'
+      +'</tr>';
+  }).join("");
+
+  var gtVsP=yoy(totCY,totPlan), gtVsY=yoy(totCY,totPY);
+  var gtRow='<tr style="background:#f3f4f6;font-weight:700">'
+    +'<td class="tl" style="font-weight:800">Total</td>'
+    +'<td class="tr" style="background:rgba(37,48,71,.07)">'+fmt$(totCY)+'</td>'
+    +'<td class="tr" style="background:rgba(27,77,46,.07)">'+(totPlan?fmt$(totPlan):"—")+'</td>'
+    +'<td class="tr '+colorClass(gtVsP)+'" style="background:rgba(27,77,46,.07)">'+(totPlan?fmtPct(gtVsP):"—")+'</td>'
+    +'<td class="tr" style="background:rgba(74,48,16,.07)">'+fmt$(totPY)+'</td>'
+    +'<td class="tr '+colorClass(gtVsY)+'" style="background:rgba(74,48,16,.07)">'+fmtPct(gtVsY)+'</td>'
+    +'</tr>';
+
+  el.innerHTML='<table>'+thead+'<tbody>'+rows+gtRow+'</tbody></table>';
+}
+
+// ── MONTHLY TREND ─────────────────────────────────────────────
+function renderMonthlyChart(filteredRows) {
+  var rows = filteredRows || enrichedBk;
+  var MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var cy=Array(12).fill(0), py=Array(12).fill(0), y2024=Array(12).fill(0);
+  var cyTotal=Array(12).fill(0); // same as cy but always from total-mode rows for plan scaling
+  rows.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    var yr=r._tripDate.getFullYear(), mo=r._tripDate.getMonth();
+    if(yr===CY)   cy[mo]+=r._revenue;
+    if(yr===PY)   py[mo]+=r._revenue;
+    if(yr===2024) y2024[mo]+=r._revenue;
+  });
+  // Build plan line using new two-step formula
+  var planLine = Array(12).fill(null);
+  if(DATA.plan&&DATA.plan.total){
+    var chartBuckets=buildPlanBuckets(TRIP_TYPE, LOC);
+    for(var m=0;m<12;m++){
+      var ym=CY+"-"+String(m+1).padStart(2,"0");
+      var planMoC=DATA.plan.total[ym]||0;
+      planLine[m] = planMoC ? planForMonth(m, planMoC, chartBuckets) : null;
+    }
+  }
+  document.getElementById("lbl-monthly").textContent="Monthly Revenue \u2014 "+CY+", Plan, "+PY;
+  var BIG_TICK = {color:"#6b7a99",font:{family:"Outfit",size:13}};
+  destroyChart("monthly");
+  var ctx=document.getElementById("chart-monthly").getContext("2d");
+  var datasets=[
+    {label:String(CY),   data:cy,      borderColor:"#254B71",backgroundColor:"rgba(37,75,113,.07)",borderWidth:3,pointRadius:4,pointBackgroundColor:"#254B71",tension:.3,fill:true},
+    {label:"Plan",       data:planLine, borderColor:"#2e7d52",backgroundColor:"transparent",borderWidth:2,borderDash:[6,3],pointRadius:3,pointBackgroundColor:"#2e7d52",tension:.3,fill:false},
+    {label:String(PY),   data:py,       borderColor:"#c97a1a",borderWidth:2,borderDash:[5,4],pointRadius:0,tension:.3,fill:false}
+  ];
+  if(CY!==2024&&PY!==2024){
+    datasets.push({label:"2024",data:y2024,borderColor:"#3a95a8",borderWidth:1.5,borderDash:[3,3],pointRadius:0,tension:.3,fill:false});
+  }
+  CHARTS["monthly"]=new Chart(ctx,{
+    type:"line",
+    data:{labels:MO,datasets:datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{family:"Outfit",size:12},color:"#6b7a99",boxWidth:22}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+(c.parsed.y!=null?"$"+Math.round(c.parsed.y).toLocaleString():"—");}}}},
+      scales:{x:{grid:{display:false},ticks:BIG_TICK},y:{grid:GRID_STYLE,ticks:Object.assign({},BIG_TICK,{callback:function(v){return "$"+(v/1000).toFixed(0)+"k";}})}}
+    }
+  });
+}
+
+// ── BREAKDOWN TABLES ─────────────────────────────────────────
+function buildGroupMap(arr, key) {
+  var m={};
+  arr.forEach(function(r){
+    var k=r[key]||"(unset)";
+    if(!m[k]) m[k]={rev:0,trips:new Set()};
+    m[k].rev+=(r._revenue||0);
+    if(r._hireId) m[k].trips.add(r._hireId);
+  });
+  return m;
+}
+
+function breakdownTable(curr, prior, groupKey, elId, labelTxt, allowedKeys, planGroupMap) {
+  var cm=buildGroupMap(curr,groupKey), pm=buildGroupMap(prior,groupKey);
+  var allKeys=Object.keys(Object.assign({},cm,pm)).sort();
+  if(allowedKeys) allKeys=allKeys.filter(function(k){ return allowedKeys.indexOf(k)!==-1; });
+  var el=document.getElementById(elId);
+  if(!allKeys.length){el.innerHTML='<p class="no-data">No data for current filters.</p>';return;}
+
+  // ── Plan: compute month-by-month then sum using new two-step formula ──
+  var ymKeys = ymKeysForMode(CY);
+  var bdBuckets = buildPlanBucketsWithGroups(TRIP_TYPE, LOC, groupKey);
+  function computePlanForGroup(grpKey) {
+    if(!DATA.plan||!DATA.plan.total) return null;
+    var total=0, hasAny=false;
+    for(var m=0; m<12; m++){
+      var ym=CY+"-"+String(m+1).padStart(2,"0");
+      var planMo=DATA.plan.total[ym]||0;
+      if(!planMo) continue;
+      var v=planForMonthGroup(m, planMo, bdBuckets, grpKey, groupKey);
+      if(v!=null){ total+=v; hasAny=true; }
+    }
+    return hasAny&&total>0 ? total : null;
+  }
+
+  var COL_CY="#253047", COL_PLAN="#1b4d2e", COL_PY="#4a3010", COL_TR="#1a3a5c";
+
+  var thead='<thead>'
+    +'<tr>'
+    +'<th class="tl" rowspan="2" style="vertical-align:middle">'+labelTxt+'</th>'
+    +'<th class="tr" style="background:'+COL_CY+'">CY Rev</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">Plan</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">CY vs Plan</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">PY Rev</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">CY vs PY</th>'
+    +'</tr></thead>';
+
+  var totCR=0,totPR=0,totPlan=0;
+
+  var rows=allKeys.map(function(k){
+    var c=cm[k]||{rev:0,trips:new Set()};
+    var p=pm[k]||{rev:0,trips:new Set()};
+    var planVal=computePlanForGroup(k);
+    var rVsP=yoy(c.rev,planVal), rVsY=yoy(c.rev,p.rev);
+    totCR+=c.rev; totPR+=p.rev; if(planVal!=null) totPlan+=planVal;
+    return '<tr><td class="tl cb">'+k+'</td>'
+      +'<td class="tr" style="background:rgba(37,48,71,.04)">'+fmt$(c.rev)+'</td>'
+      +'<td class="tr" style="background:rgba(27,77,46,.04)">'+(planVal!=null?fmt$(planVal):"—")+'</td>'
+      +'<td class="tr '+colorClass(rVsP)+'" style="background:rgba(27,77,46,.04)">'+(planVal!=null?fmtPct(rVsP):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(74,48,16,.04)">'+fmt$(p.rev)+'</td>'
+      +'<td class="tr '+colorClass(rVsY)+'" style="background:rgba(74,48,16,.04)">'+fmtPct(rVsY)+'</td>'
+      +'</tr>';
+  }).join("");
+
+
+    var gtVsP=yoy(totCR,totPlan||null), gtVsY=yoy(totCR,totPR);
+  var gtRow='<tr style="background:#f3f4f6;font-weight:700">'
+    +'<td class="tl" style="font-weight:700">Grand Total</td>'
+    +'<td class="tr">'+fmt$(totCR)+'</td>'
+    +'<td class="tr">'+(totPlan?fmt$(totPlan):"—")+'</td>'
+    +'<td class="tr '+colorClass(gtVsP)+'">'+(totPlan?fmtPct(gtVsP):"—")+'</td>'
+    +'<td class="tr">'+fmt$(totPR)+'</td>'
+    +'<td class="tr '+colorClass(gtVsY)+'">'+(fmtPct(gtVsY))+'</td>'
+    +'</tr>';
+
+el.innerHTML='<table>'+thead+'<tbody>'+rows+gtRow+'</tbody></table>';
+}
+
+// ── OPS FILTER HELPERS ────────────────────────────────────────
+// Returns true if the given date passes the current MODE date window (per-year generalized)
+function opsDatePassYTD(date) {
+  if(!date) return false;
+  var mo = date.getMonth(), day = date.getDate();
+  var todayMo = TODAY.getMonth(), todayDay = TODAY.getDate();
+  if(mo < todayMo) return true;
+  if(mo === todayMo && day <= todayDay) return true;
+  return false;
+}
+function opsPassTripTypeLoc(r) {
+  if(TRIP_TYPE!=="all" && r._type!==TRIP_TYPE) return false;
+  if(LOC!=="all" && r._loc!==LOC) return false;
+  return true;
+}
+
+// ── OPS DATA ─────────────────────────────────────────────────
+function buildOpsData() {
+  var groups={};
+  var allG=new Set();
+  enrichedCharter.forEach(function(r){ allG.add(r._grp); });
+  enrichedFuel.forEach(function(r){ allG.add(r._grp); });
+  enrichedService.forEach(function(r){ allG.add(r._grp); });
+  enrichedUtil.forEach(function(r){ allG.add(r._grp); });
+  allG.forEach(function(g){ if(validFleet(g)) groups[g]={rev:0,miles:0,fuel:0,svc:0,busDays:0}; });
+
+  // Charter Revenue drives ops revenue + miles
+  enrichedCharter.forEach(function(r){
+    var g=r._grp; if(!validFleet(g)||!groups[g]) return;
+    if(!opsDatePassYTD(r._date)) return;
+    if(!opsPassTripTypeLoc(r)) return;
+    if(r._revenue) groups[g].rev+=r._revenue;
+    if(r._miles) groups[g].miles+=r._miles;
+  });
+
+  // Vehicle Utilization drives Bus Days
+  enrichedUtil.forEach(function(r){
+    var g=r._grp; if(!validFleet(g)||!groups[g]) return;
+    var parts=r._dateKey.split("-");
+    var d=new Date(+parts[0],+parts[1]-1,+parts[2]);
+    if(!opsDatePassYTD(d)) return;
+    groups[g].busDays += r._busDayVal;
+  });
+
+  enrichedFuel.forEach(function(r){
+    var g=r._grp; if(!validFleet(g)||!groups[g]||!r._cost) return;
+    if(!opsDatePassYTD(r._date)) return;
+    groups[g].fuel+=r._cost;
+  });
+  enrichedService.forEach(function(r){
+    var g=r._grp; if(!validFleet(g)||!groups[g]||!r._cost) return;
+    if(!opsDatePassYTD(r._date)) return;
+    groups[g].svc+=r._cost;
+  });
+
+  return Object.keys(groups).map(function(group){
+    var v=groups[group];
+    var bd=Math.round(v.busDays*10)/10; // one decimal for fractional days
+    return {
+      group:group,
+      revenue:Math.round(v.rev), miles:Math.round(v.miles),
+      fuel:Math.round(v.fuel), svc:Math.round(v.svc), busDays:bd,
+      rpm:v.miles>0?v.rev/v.miles:null, fpm:v.miles>0?v.fuel/v.miles:null, spm:v.miles>0?v.svc/v.miles:null,
+      rpd:bd>0?v.rev/bd:null, fpd:bd>0?v.fuel/bd:null, spd:bd>0?v.svc/bd:null
+    };
+  }).sort(function(a,b){ return b.revenue-a.revenue; });
+}
+
+// ── OPS DATA BY YEAR ──────────────────────────────────────────
+function buildOpsDataByYear(fleetFilter) {
+  var byYear = {}; // { year: { group: {rev,miles,fuel,svc,busDays} } }
+
+  function ensure(yr, grp) {
+    if(!byYear[yr]) byYear[yr]={};
+    if(!byYear[yr][grp]) byYear[yr][grp]={rev:0,miles:0,fuel:0,svc:0,busDays:0};
+    return byYear[yr][grp];
+  }
+
+  enrichedCharter.forEach(function(r){
+    if(!r._date) return;
+    var g=r._grp; if(!g||g==="Unknown") return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=r._date.getFullYear();
+    var v=ensure(yr,g);
+    if(r._revenue) v.rev+=r._revenue;
+    if(r._miles) v.miles+=r._miles;
+  });
+  enrichedUtil.forEach(function(r){
+    var g=r._grp; if(!g||g==="Unknown") return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=parseInt(r._dateKey.split("-")[0]);
+    if(!yr) return;
+    ensure(yr,g).busDays+=r._busDayVal;
+  });
+  enrichedFuel.forEach(function(r){
+    if(!r._date) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=r._date.getFullYear();
+    if(r._cost) ensure(yr,g).fuel+=r._cost;
+  });
+  enrichedService.forEach(function(r){
+    if(!r._date) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=r._date.getFullYear();
+    if(r._cost) ensure(yr,g).svc+=r._cost;
+  });
+
+  // Aggregate to year-level totals (sum across fleet groups)
+  var result = [];
+  Object.keys(byYear).sort().forEach(function(yr){
+    var tot={rev:0,miles:0,fuel:0,svc:0,busDays:0};
+    Object.values(byYear[yr]).forEach(function(v){
+      tot.rev+=v.rev; tot.miles+=v.miles;
+      tot.fuel+=v.fuel; tot.svc+=v.svc; tot.busDays+=v.busDays;
+    });
+    var bd=Math.round(tot.busDays*10)/10;
+    result.push({
+      year:+yr,
+      rpm:tot.miles>0?tot.rev/tot.miles:null,
+      fpm:tot.miles>0?tot.fuel/tot.miles:null,
+      spm:tot.miles>0?tot.svc/tot.miles:null,
+      rpd:bd>0?tot.rev/bd:null,
+      fpd:bd>0?tot.fuel/bd:null,
+      spd:bd>0?tot.svc/bd:null
+    });
+  });
+  return result;
+}
+
+function renderOpsTables(opsData) {
+  var vis=FLEET_FILT==="all"?opsData:opsData.filter(function(d){return d.group===FLEET_FILT;});
+
+  // ── Grand totals (weighted averages for per-unit metrics) ──
+  function grandTotals(arr) {
+    var tRev=0,tMiles=0,tFuel=0,tSvc=0,tBd=0;
+    arr.forEach(function(d){ tRev+=d.revenue||0; tMiles+=d.miles||0; tFuel+=d.fuel||0; tSvc+=d.svc||0; tBd+=d.busDays||0; });
+    return {
+      rpm:tMiles>0?tRev/tMiles:null, fpm:tMiles>0?tFuel/tMiles:null, spm:tMiles>0?tSvc/tMiles:null,
+      rpd:tBd>0?tRev/tBd:null,       fpd:tBd>0?tFuel/tBd:null,       spd:tBd>0?tSvc/tBd:null
+    };
+  }
+
+  var gt=grandTotals(vis);
+
+  // ── Per Mile table ──
+  var pm=document.getElementById("tbl-permile");
+  if(!vis.length){pm.innerHTML='<p class="no-data">No operations data loaded.</p>';}
+  else {
+    var rows=vis.map(function(d){
+      return '<tr><td class="tl cb">'+d.group+'</td><td class="tr ct">'+(d.rpm!=null?fmt$(d.rpm,2):"—")+'</td><td class="tr cr">'+(d.fpm!=null?fmt$(d.fpm,2):"—")+'</td><td class="tr ca">'+(d.spm!=null?fmt$(d.spm,2):"—")+'</td></tr>';
+    }).join("");
+    var gtRow='<tr style="background:#f1f3f6;font-weight:700"><td class="tl" style="font-weight:800">Grand Total</td><td class="tr ct">'+(gt.rpm!=null?fmt$(gt.rpm,2):"—")+'</td><td class="tr cr">'+(gt.fpm!=null?fmt$(gt.fpm,2):"—")+'</td><td class="tr ca">'+(gt.spm!=null?fmt$(gt.spm,2):"—")+'</td></tr>';
+    pm.innerHTML='<table><thead><tr><th class="tl">Fleet Group</th><th class="tr">Rev / Mile</th><th class="tr">Fuel / Mile</th><th class="tr">Maint. / Mile</th></tr></thead><tbody>'+rows+gtRow+'</tbody></table>';
+  }
+
+  // ── Per Bus Day table ──
+  var pd=document.getElementById("tbl-perday");
+  if(!vis.length){pd.innerHTML='<p class="no-data">No data available.</p>';}
+  else {
+    var rows2=vis.map(function(d){
+      return '<tr><td class="tl cb">'+d.group+'</td><td class="tr ct">'+(d.rpd!=null?fmt$(d.rpd):"—")+'</td><td class="tr cr">'+(d.fpd!=null?fmt$(d.fpd):"—")+'</td><td class="tr ca">'+(d.spd!=null?fmt$(d.spd):"—")+'</td></tr>';
+    }).join("");
+    var gtRow2='<tr style="background:#f1f3f6;font-weight:700"><td class="tl" style="font-weight:800">Grand Total</td><td class="tr ct">'+(gt.rpd!=null?fmt$(gt.rpd):"—")+'</td><td class="tr cr">'+(gt.fpd!=null?fmt$(gt.fpd):"—")+'</td><td class="tr ca">'+(gt.spd!=null?fmt$(gt.spd):"—")+'</td></tr>';
+    pd.innerHTML='<table><thead><tr><th class="tl">Fleet Group</th><th class="tr">Rev / Bus Day</th><th class="tr">Fuel / Bus Day</th><th class="tr">Maint. / Bus Day</th></tr></thead><tbody>'+rows2+gtRow2+'</tbody></table>';
+  }
+
+  // ── KPI cards: CY vs PY for all 6 metrics (top of ops tab) ──
+  // Build CY and PY totals from enriched data for YoY comparison
+  function opsYearTotals(yr) {
+    var t={rev:0,miles:0,fuel:0,svc:0,busDays:0};
+    enrichedCharter.forEach(function(r){
+      if(!r._date||r._date.getFullYear()!==yr) return;
+      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
+      if(!opsDatePassYTD(r._date)) return;
+      if(!opsPassTripTypeLoc(r)) return;
+      t.rev+=r._revenue||0; t.miles+=r._miles||0;
+    });
+    enrichedUtil.forEach(function(r){
+      var ry=+r._dateKey.split("-")[0];
+      if(ry!==yr) return;
+      if(!validFleet(r._grp)) return;
+      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
+      var parts=r._dateKey.split("-");
+      var d=new Date(+parts[0],+parts[1]-1,+parts[2]);
+      if(!opsDatePassYTD(d)) return;
+      t.busDays+=r._busDayVal||0;
+    });
+    enrichedFuel.forEach(function(r){
+      if(!r._date||r._date.getFullYear()!==yr) return;
+      if(!validFleet(r._grp)) return;
+      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
+      if(!opsDatePassYTD(r._date)) return;
+      t.fuel+=r._cost||0;
+    });
+    enrichedService.forEach(function(r){
+      if(!r._date||r._date.getFullYear()!==yr) return;
+      if(!validFleet(r._grp)) return;
+      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
+      if(!opsDatePassYTD(r._date)) return;
+      t.svc+=r._cost||0;
+    });
+    var bd=t.busDays;
+    return {
+      rpm:t.miles>0?t.rev/t.miles:null,   fpm:t.miles>0?t.fuel/t.miles:null,  spm:t.miles>0?t.svc/t.miles:null,
+      rpd:bd>0?t.rev/bd:null,              fpd:bd>0?t.fuel/bd:null,             spd:bd>0?t.svc/bd:null
+    };
+  }
+
+  var cy=opsYearTotals(CY), py=opsYearTotals(PY);
+  var kpiDefs=[
+    {key:"rpm",lbl:"Revenue / Mile",     fmtFn:function(v){return fmt$(v,2);}, cls:"ct"},
+    {key:"fpm",lbl:"Fuel Cost / Mile",   fmtFn:function(v){return fmt$(v,2);}, cls:"cr"},
+    {key:"spm",lbl:"Maint. Cost / Mile", fmtFn:function(v){return fmt$(v,2);}, cls:"ca"},
+    {key:"rpd",lbl:"Revenue / Bus Day",  fmtFn:function(v){return fmt$(v);},   cls:"ct"},
+    {key:"fpd",lbl:"Fuel Cost / Bus Day",fmtFn:function(v){return fmt$(v);},   cls:"cr"},
+    {key:"spd",lbl:"Maint. / Bus Day",   fmtFn:function(v){return fmt$(v);},   cls:"ca"}
+  ];
+  var mileKpis=kpiDefs.slice(0,3), dayKpis=kpiDefs.slice(3);
+  function renderKpiCards(defs, elId) {
+    var el=document.getElementById(elId); if(!el) return;
+    el.innerHTML=defs.map(function(k){
+      var cyVal=cy[k.key], pyVal=py[k.key];
+      var chg=yoy(cyVal,pyVal);
+      return '<div class="kpi-card" style="min-width:0">'
+        +'<div class="kpi-lbl">'+k.lbl+'</div>'
+        +'<div class="kpi-val '+k.cls+'" style="font-size:22px">'+(cyVal!=null?k.fmtFn(cyVal):"—")+'</div>'
+        +'<div class="kpi-sub"><span>'+pillHTML(chg)+'</span><span class="kpi-sub-txt">Prior: '+(pyVal!=null?k.fmtFn(pyVal):"—")+'</span></div>'
+        +'</div>';
+    }).join("");
+  }
+  renderKpiCards(mileKpis,"ops-kpi-mile");
+  renderKpiCards(dayKpis,"ops-kpi-day");
+}
+
+var OPS_METRIC = "rpm";
+var OPS_METRIC_META = {
+  rpm:{lbl:"Revenue / Mile",         fmt:function(v){return "$"+v.toFixed(2);}, color:"#254B71"},
+  fpm:{lbl:"Fuel Cost / Mile",        fmt:function(v){return "$"+v.toFixed(2);}, color:"#c0392b"},
+  spm:{lbl:"Maint. Cost / Mile",      fmt:function(v){return "$"+v.toFixed(2);}, color:"#c97a1a"},
+  rpd:{lbl:"Revenue / Bus Day",       fmt:function(v){return fmt$(v);},          color:"#254B71"},
+  fpd:{lbl:"Fuel Cost / Bus Day",     fmt:function(v){return fmt$(v);},          color:"#c0392b"},
+  spd:{lbl:"Maint. Cost / Bus Day",   fmt:function(v){return fmt$(v);},          color:"#c97a1a"}
+};
+var VALID_FLEET = {OTR:1, MED:1, LOCAL:1, MINI:1};
+function validFleet(g){ return g && VALID_FLEET[g]; }
+
+
+// ── OPS DATA BY MONTH ─────────────────────────────────────────
+// Returns { year: [12 values or null] } for the chosen metric
+function buildOpsDataByMonth(fleetFilter, metric) {
+  // Accumulate raw totals per year per month
+  var byYrMo = {}; // { year: { month: {rev,miles,fuel,svc,busDays} } }
+
+  function ensure(yr, mo) {
+    if(!byYrMo[yr]) byYrMo[yr] = {};
+    if(!byYrMo[yr][mo]) byYrMo[yr][mo] = {rev:0,miles:0,fuel:0,svc:0,busDays:0};
+    return byYrMo[yr][mo];
+  }
+
+  // Prior years: full year. CY: YTD only.
+  function opsByMonthDatePass(date) {
+    if(!date) return false;
+    if(date.getFullYear() < CY) return true;
+    return opsDatePassYTD(date);
+  }
+  enrichedCharter.forEach(function(r){
+    if(!r._date||!opsByMonthDatePass(r._date)) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    if(!opsPassTripTypeLoc(r)) return;
+    var yr=r._date.getFullYear(), mo=r._date.getMonth();
+    var v=ensure(yr,mo);
+    if(r._revenue) v.rev+=r._revenue;
+    if(r._miles)   v.miles+=r._miles;
+  });
+  enrichedUtil.forEach(function(r){
+    var parts=r._dateKey.split("-");
+    var d=new Date(+parts[0],+parts[1]-1,+parts[2]);
+    if(!opsByMonthDatePass(d)) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=+parts[0], mo=+parts[1]-1;
+    ensure(yr,mo).busDays+=r._busDayVal;
+  });
+  enrichedFuel.forEach(function(r){
+    if(!r._date||!opsByMonthDatePass(r._date)) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=r._date.getFullYear(), mo=r._date.getMonth();
+    if(r._cost) ensure(yr,mo).fuel+=r._cost;
+  });
+  enrichedService.forEach(function(r){
+    if(!r._date||!opsByMonthDatePass(r._date)) return;
+    var g=r._grp; if(!validFleet(g)) return;
+    if(fleetFilter!=="all" && g!==fleetFilter) return;
+    var yr=r._date.getFullYear(), mo=r._date.getMonth();
+    if(r._cost) ensure(yr,mo).svc+=r._cost;
+  });
+
+  // Convert to 12-value arrays per year
+  // YTD/Booked: only show months up to today's month (same cutoff each year)
+  var result = {};
+  Object.keys(byYrMo).forEach(function(yr){
+    result[yr] = Array(12).fill(null);
+    var cutoffMo = (+yr === CY) ? TODAY.getMonth() : 11;
+    for(var mo=0; mo<12; mo++){
+      if(mo > cutoffMo) continue; // CY: YTD only; prior years: full 12 months
+      var v = byYrMo[yr][mo];
+      if(!v) continue;
+      var bd = v.busDays;
+      var val = null;
+      if(metric==="rpm") val = v.miles>0 ? v.rev/v.miles : null;
+      else if(metric==="fpm") val = v.miles>0 ? v.fuel/v.miles : null;
+      else if(metric==="spm") val = v.miles>0 ? v.svc/v.miles : null;
+      else if(metric==="rpd") val = bd>0 ? v.rev/bd : null;
+      else if(metric==="fpd") val = bd>0 ? v.fuel/bd : null;
+      else if(metric==="spd") val = bd>0 ? v.svc/bd : null;
+      result[yr][mo] = val;
+    }
+  });
+  return result;
+}
+
+function renderOpsTrendChart() {
+  var meta = OPS_METRIC_META[OPS_METRIC];
+  var MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var YEAR_COLORS = ["#254B71","#3a95a8","#c97a1a","#2e7d52","#c0392b","#7b6fa0","#888"];
+  var byMonth = buildOpsDataByMonth(FLEET_FILT, OPS_METRIC);
+  var years = Object.keys(byMonth).sort();
+
+  document.getElementById("lbl-ops-trend").textContent =
+    "Monthly Trend — " + meta.lbl + (FLEET_FILT!=="all"?" · "+FLEET_FILT:"");
+
+  destroyChart("ops-trend");
+  var ctx = document.getElementById("chart-ops-trend");
+  if(!ctx||!years.length) return;
+
+  var BIG_TICK = {color:"#6b7a99",font:{family:"Outfit",size:12}};
+  var datasets = years.map(function(yr, i){
+    var isCY = (+yr===CY);
+    return {
+      label: String(yr),
+      data:  byMonth[yr],
+      borderColor:      YEAR_COLORS[i % YEAR_COLORS.length],
+      backgroundColor:  isCY ? "rgba(37,75,113,.07)" : "transparent",
+      borderWidth:      isCY ? 3 : 2,
+      borderDash:       isCY ? [] : [5,4],
+      pointRadius:      isCY ? 4 : 2,
+      pointBackgroundColor: YEAR_COLORS[i % YEAR_COLORS.length],
+      tension: 0.3,
+      fill:  isCY,
+      spanGaps: true
+    };
+  });
+
+  CHARTS["ops-trend"] = new Chart(ctx.getContext("2d"), {
+    type:"line",
+    data:{ labels:MO, datasets:datasets },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{font:{family:"Outfit",size:12},color:"#6b7a99",boxWidth:24}},
+        tooltip:{callbacks:{label:function(c){
+          return c.dataset.label+": "+(c.parsed.y!=null?meta.fmt(c.parsed.y):"—");
+        }}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:BIG_TICK},
+        y:{grid:GRID_STYLE,ticks:Object.assign({},BIG_TICK,{callback:function(v){ return meta.fmt(v); }})}
+      }
+    }
+  });
+}
+
+function renderAllOpsCharts() {
+  renderOpsTrendChart();
+}
+
+// ── DATA INSPECTOR ────────────────────────────────────────────
+function renderInspector() {
+  var sources=[
+    {name:"Firm Bookings",    count:DATA.bookings.length+" rows",   keys:DATA.bookings.length?Object.keys(DATA.bookings[0]):[]},
+    {name:"Fleet Assignments",count:Object.keys(DATA.fleet).length+" vehicles",keys:Object.keys(DATA.fleet).length?["Vehicle ID (key)"].concat(Object.keys(Object.values(DATA.fleet)[0]||{}).slice(0,6).map(function(k){return "Period "+k;})):[]},
+    {name:"Fuel History",     count:DATA.fuel.length+" rows",       keys:DATA.fuel.length?Object.keys(DATA.fuel[0]):[]},
+    {name:"Service History",  count:DATA.service.length+" rows",    keys:DATA.service.length?Object.keys(DATA.service[0]):[]},
+    {name:"Charter Revenue",    count:DATA.charter.length+" rows",  keys:DATA.charter.length?Object.keys(DATA.charter[0]):[]},
+    {name:"Vehicle Utilization",count:Object.keys((DATA.utilization&&DATA.utilization.hours)||{}).length+" vehicles", keys:Object.keys((DATA.utilization&&DATA.utilization.hours)||{}).length?["Col A = Date","Row 2 = Vehicle ID","Row 1 = Fleet Group","Values = Hours"]:[]},
+    {name:"2026 Plan",count:Object.keys((DATA.plan&&DATA.plan.total)||{}).length+" months",keys:Object.keys((DATA.plan&&DATA.plan.total)||{}).length?["Col A=Year","Col B=Month","Row 1=Category","Row 2=Label","Values=Revenue"]:[]}
+  ];
+
+  var html=sources.map(function(s){
+    var ok=s.keys.length>0;
+    return '<div class="ds-card" style="'+(ok?"":"border-color:rgba(220,38,38,.3)")+'">'
+      +'<div class="ds-hdr"><div class="ds-title" style="'+(ok?"":"color:var(--red)")+'">'+s.name+'</div>'
+      +'<span class="ds-badge '+(ok?"ds-ok":"ds-err")+'">'+(ok?s.count:"NOT LOADED")+'</span></div>'
+      +(ok?'<div class="ds-cols">'+s.keys.map(function(c){return '<span class="ds-col">'+c+'</span>';}).join("")+'</div>'
+          :'<div class="ds-errmsg">&#9888; No data loaded &mdash; check the Google Sheet is published to web as CSV.</div>')
+      +'</div>';
+  }).join("");
+
+  html+='<div class="join-card"><div class="sec-lbl">Join Keys Reference</div>'
+    +'<table><thead><tr><th class="tl">Left File</th><th class="tl">Left Key</th><th class="tl">Right File</th><th class="tl">Right Key</th></tr></thead><tbody>'
+    +'<tr><td class="tl cb">Charter Revenue</td><td class="tl">VehicleID</td><td class="tl cb">Fleet Assignments</td><td class="tl">ID (Column A)</td></tr>'
+    +'<tr><td class="tl cb">Charter Revenue</td><td class="tl">VehicleID</td><td class="tl cb">Fuel History</td><td class="tl">Vehicle Name</td></tr>'
+    +'<tr><td class="tl cb">Charter Revenue</td><td class="tl">VehicleID</td><td class="tl cb">Service History</td><td class="tl">Vehicle Name</td></tr>'
+    +'<tr><td class="tl cb">Charter Revenue</td><td class="tl">PrivateHireID</td><td class="tl cb">Firm Bookings</td><td class="tl">Private Hire ID</td></tr>'
+    +'</tbody></table></div>';
+
+  document.getElementById("inspector-grid").innerHTML=html;
+}
+
+// ── FULL RENDER ───────────────────────────────────────────────
+function render() {
+  updatePeriodDesc();
+  var filtered=filterBookings();
+  renderKPIs(filtered.curr, filtered.prior);
+  // Charts filtered by type, location, AND period mode
+  // For each row, include it if it would fall within the "current year" window for its own year
+  var allYearsFiltered = enrichedBk.filter(function(r){
+    if(TRIP_TYPE!=="all" && r._type!==TRIP_TYPE) return false;
+    if(LOC!=="all" && r._loc!==LOC) return false;
+    if(MODE==="ytd") {
+      var d = r._tripDate; if(!d) return false;
+      var mo = d.getMonth(), day = d.getDate();
+      var todayMo = TODAY.getMonth(), todayDay = TODAY.getDate();
+      if(mo < todayMo) return true;
+      if(mo === todayMo && day <= todayDay) return true;
+      return false;
+    } else if(MODE==="booked") {
+      // For a trip in year Y, include if bookingDate <= date(Y, todayMonth, todayDay)
+      // This mirrors the KPI logic exactly, generalised across all years
+      var bd = r._bookingDate;
+      var td = r._tripDate;
+      if(!bd || !td) return false;
+      var tripYr = td.getFullYear();
+      var cutoff = new Date(tripYr, TODAY.getMonth(), TODAY.getDate());
+      return bd <= cutoff;
+    } else {
+      // Total Bookings: all rows pass (full year)
+      return !!r._tripDate;
+    }
+  });
+  renderMonthlyChart(allYearsFiltered);
+  renderMonthlyTable(allYearsFiltered);
+  breakdownTable(filtered.curr, filtered.prior, "_type", "tbl-type", "Trip Type", ["1Day Trips","Multi-day"], DATA.plan&&DATA.plan.byType);
+  breakdownTable(filtered.curr, filtered.prior, "_loc",  "tbl-loc",  "Location",  null,                              DATA.plan&&DATA.plan.byLoc);
+  var opsData=buildOpsData();
+  renderOpsTables(opsData);
+  renderAllOpsCharts();
+  renderInspector();
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active",b.dataset.tab===name); });
+  ["revenue","operations","data"].forEach(function(id){
+    document.getElementById("tab-"+id).style.display=(id===name)?"block":"none";
+  });
+  var revOnly = (name==="revenue");
+  document.getElementById("fb-period-mode").style.display = revOnly ? "" : "none";
+  document.getElementById("period-desc").style.display    = revOnly ? "" : "none";
+}
+
+// ── LOAD ALL (sequential — one request at a time) ───────────────
+function loadAll() {
+  document.getElementById("loading").style.display = "flex";
+  document.getElementById("loading-msg").textContent = "LOADING DATA SOURCES — Please wait ~25s";
+  document.getElementById("loading-detail").textContent = "Starting…";
+  ["tab-revenue","tab-operations","tab-data"].forEach(function(id) {
+    document.getElementById(id).style.display = "none";
+  });
+
+  var queue = [
+    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings" },
+    { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments" },
+    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History" },
+    { key:"service",     url:URLS.service,     header:true,  label:"Service History" },
+    { key:"charter",     url:URLS.charter,     header:true,  label:"Charter Revenue" },
+    { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization" },
+    { key:"plan",         url:URLS.plan,         header:false, label:"2026 Plan" }
+  ];
+  var results = {};
+  var qIdx = 0;
+
+  function loadNext() {
+    if (qIdx >= queue.length) {
+      finalize();
+      return;
+    }
+    var item = queue[qIdx];
+    document.getElementById("loading-detail").textContent =
+      "(" + (qIdx+1) + "/7) Fetching " + item.label + "…";
+
+    fetchCSV(item.url, item.header, function(data) {
+      results[item.key] = data;
+      var rows = data.length;
+      var status = rows > 0 ? "✓ " + rows + " rows" : "✗ 0 rows — check sheet is published";
+      var color = rows > 0 ? "#16a34a" : "#c0392b";
+      document.getElementById("loading-detail").textContent =
+        "(" + (qIdx+1) + "/7) " + item.label + " — " + status;
+      var logEl = document.getElementById("load-log");
+      logEl.innerHTML += "<span style='color:" + color + "'>" + status + "</span>  " + item.label + "<br>";
+      qIdx++;
+      setTimeout(loadNext, 2500);  // codetabs rate-limits if hit too fast
+    });
+  }
+
+  function finalize() {
+    DATA.bookings    = results.bookings    || [];
+    DATA.fleet       = parseFleet(results.fleet || []);
+    DATA.fuel        = results.fuel        || [];
+    DATA.service     = results.service     || [];
+    DATA.charter     = results.charter     || [];
+    DATA.utilization = parseUtilization(results.utilization || []);
+    DATA.plan        = parsePlan(results.plan || []);
+
+    enrichAll();
+    var opsData = buildOpsData();
+    populateDropdowns(opsData);
+    render();
+
+    document.getElementById("loading").style.display = "none";
+    showTab("revenue");
+    document.getElementById("refresh-time").textContent =
+      "↻ " + new Date().toLocaleTimeString();
+  }
+
+  loadNext();
+}
+
+// ── CONNECTION TEST ──────────────────────────────────────────
+function runConnectionTest() {
+  var btn = document.getElementById("btn-conntest");
+  btn.textContent = "TESTING…";
+  btn.disabled = true;
+  var resultsEl = document.getElementById("conn-test-results");
+  resultsEl.style.display = "block";
+  resultsEl.innerHTML = "<div class='card' style='font-family:JetBrains Mono,monospace;font-size:11px'><div class='sec-lbl' style='margin-bottom:12px'>Connection Test Results</div><div id='ct-rows'></div></div>";
+
+  var sources = [
+    { label:"Firm Bookings",     url: URLS.bookings },
+    { label:"Fleet Assignments", url: URLS.fleet },
+    { label:"Fuel History",      url: URLS.fuel },
+    { label:"Service History",   url: URLS.service },
+    { label:"Charter Revenue",   url: URLS.charter }
+  ];
+
+  var proxies = [
+    { name: "direct",     buildUrl: function(u){ return u; } },
+    { name: "corsproxy",  buildUrl: function(u){ return "https://corsproxy.io/?" + encodeURIComponent(u); } },
+    { name: "allorigins", buildUrl: function(u){ return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); } }
+  ];
+
+  var ctRows = document.getElementById("ct-rows");
+  var sIdx = 0;
+
+  function testNextSource() {
+    if (sIdx >= sources.length) {
+      btn.textContent = "RUN CONNECTION TEST";
+      btn.disabled = false;
+      return;
+    }
+    var src = sources[sIdx++];
+    var rowId = "ct-" + sIdx;
+    ctRows.innerHTML += "<div id='" + rowId + "' style='margin-bottom:10px;padding:10px;background:#f8f9fb;border-radius:6px;border:1px solid #e2e5eb'>"
+      + "<div style='font-weight:700;color:#1a2233;margin-bottom:6px'>" + src.label + "</div>"
+      + "<div id='" + rowId + "-status' style='color:#6b7a99'>Testing…</div></div>";
+
+    var pIdx = 0;
+    var proxyResults = [];
+
+    function testNextProxy() {
+      if (pIdx >= proxies.length) {
+        var anyOk = proxyResults.some(function(r){ return r.ok; });
+        document.getElementById(rowId + "-status").innerHTML = proxyResults.map(function(r){
+          var c = r.ok ? "#16a34a" : "#c0392b";
+          return "<span style='color:" + c + ";margin-right:16px'>" + r.name + ": " + r.msg + "</span>";
+        }).join("");
+        testNextSource();
+        return;
+      }
+      var proxy = proxies[pIdx++];
+      var testUrl = proxy.buildUrl(src.url);
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", testUrl, true);
+      xhr.timeout = 12000;
+      xhr.onload = function() {
+        var txt = xhr.responseText || "";
+        var first = txt.trim().charAt(0);
+        var valid = xhr.status >= 200 && xhr.status < 300 && first !== "<" && first !== "{" && txt.trim().length > 20;
+        var lines = txt.split("\n").length;
+        proxyResults.push({
+          name: proxy.name, ok: valid,
+          msg: valid ? ("✓ "+lines+" lines") : ("✗ HTTP "+xhr.status+(txt.length?(" first:'"+first+"'"):""))
+        });
+        testNextProxy();
+      };
+      xhr.onerror = function(){ proxyResults.push({name:proxy.name,ok:false,msg:"✗ network error"}); testNextProxy(); };
+      xhr.ontimeout = function(){ proxyResults.push({name:proxy.name,ok:false,msg:"✗ timeout"}); testNextProxy(); };
+      xhr.send();
+    }
+    testNextProxy();
+  }
+
+  testNextSource();
+}
+
+// ── EVENTS ───────────────────────────────────────────────────
+document.querySelectorAll(".tab-btn").forEach(function(b){
+  b.addEventListener("click",function(){ showTab(b.dataset.tab); });
+});
+document.querySelectorAll(".mode-btn").forEach(function(b){
+  b.addEventListener("click",function(){
+    MODE=b.dataset.mode;
+    document.querySelectorAll(".mode-btn").forEach(function(x){ x.classList.toggle("active",x===b); });
+    render();
+  });
+});
+document.getElementById("sel-type").addEventListener("change",function(e){ TRIP_TYPE=e.target.value; render(); });
+document.getElementById("sel-loc").addEventListener("change",function(e){ LOC=e.target.value; render(); });
+document.getElementById("sel-fleet").addEventListener("change",function(e){
+  FLEET_FILT=e.target.value;
+  var opsData=buildOpsData();
+  renderOpsTables(opsData);
+  renderAllOpsCharts();
+});
+document.getElementById("sel-ops-metric").addEventListener("change",function(){
+  OPS_METRIC=this.value;
+  renderOpsTrendChart();
+});
+document.getElementById("btn-refresh").addEventListener("click",loadAll);
+document.getElementById("btn-conntest").addEventListener("click", runConnectionTest);
+
+// ── START ─────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>

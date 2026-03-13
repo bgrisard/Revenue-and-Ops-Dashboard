@@ -1478,7 +1478,7 @@ function renderOneOpsTrendChart(metricKey, canvasId) {
   var MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   var YEAR_COLORS = ["#1e40af","#0ea5e9","#f59e0b","#16a34a","#ef4444","#7c3aed","#888"];
   var byMonth = buildOpsDataByMonth(FLEET_FILT, metricKey);
-  var years = Object.keys(byMonth).sort();
+  var years = Object.keys(byMonth).filter(function(y){ return +y !== 2023; }).sort();
 
   destroyChart("ops-"+metricKey);
   var ctx = document.getElementById(canvasId);

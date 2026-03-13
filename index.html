@@ -157,25 +157,30 @@ tbody tr:hover{background:#f9fafb}
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:3fr 2fr;gap:18px;align-items:start">
-      <div class="card">
-        <div class="sec-lbl" id="lbl-monthly">Monthly Revenue</div>
-        <div class="chart-wrap chart-wrap-lg"><canvas id="chart-monthly"></canvas></div>
-        <div style="margin-top:18px" id="tbl-monthly-wrap"></div>
+    <!-- Full-width monthly chart -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sec-lbl" id="lbl-monthly">Monthly Revenue</div>
+      <div class="chart-wrap chart-wrap-lg"><canvas id="chart-monthly"></canvas></div>
+    </div>
+    <!-- 3-col breakdowns -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:var(--thead);padding:11px 18px">
+          <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Monthly Revenue</div>
+        </div>
+        <div class="tbl-wrap" id="tbl-monthly-wrap"></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
-          <div style="background:var(--thead);padding:11px 18px">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Trip Type</div>
-          </div>
-          <div class="tbl-wrap" id="tbl-type"></div>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:var(--thead);padding:11px 18px">
+          <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Trip Type</div>
         </div>
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
-          <div style="background:var(--thead);padding:11px 18px">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Location</div>
-          </div>
-          <div class="tbl-wrap" id="tbl-loc"></div>
+        <div class="tbl-wrap" id="tbl-type"></div>
+      </div>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:var(--thead);padding:11px 18px">
+          <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Location</div>
         </div>
+        <div class="tbl-wrap" id="tbl-loc"></div>
       </div>
     </div>
   </div>
@@ -188,25 +193,15 @@ tbody tr:hover{background:#f9fafb}
         <span class="fb-label">Fleet Group</span>
         <select id="sel-fleet" class="fb-select"><option value="all">All Fleet Groups</option></select>
       </div>
-      <div class="fb-group">
-        <span class="fb-label">Trend Metric</span>
-        <select id="sel-ops-metric" class="fb-select">
-          <option value="rpm">Revenue / Mile</option>
-          <option value="fpm">Fuel Cost / Mile</option>
-          <option value="spm">Maint. Cost / Mile</option>
-          <option value="rpd">Revenue / Bus Day</option>
-          <option value="fpd">Fuel Cost / Bus Day</option>
-          <option value="spd">Maint. Cost / Bus Day</option>
-        </select>
-      </div>
+
       <span style="font-size:10px;color:var(--muted);padding-bottom:10px">Bus Day = vehicle used &#8805; 5 hrs on a single calendar day (partial days pro-rated)</span>
     </div>
 
-    <!-- KPI cards at top with headers -->
-    <div style="margin-bottom:6px;font-size:10px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Per Mile</div>
-    <div id="ops-kpi-mile" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"></div>
-    <div style="margin-bottom:6px;font-size:10px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Per Bus Day</div>
-    <div id="ops-kpi-day" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px"></div>
+    <!-- KPI cards — single row of 6 -->
+    <div id="ops-kpi-row-all" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px">
+      <div id="ops-kpi-mile" style="display:contents"></div>
+      <div id="ops-kpi-day" style="display:contents"></div>
+    </div>
 
     <!-- Side-by-side tables -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
@@ -224,10 +219,19 @@ tbody tr:hover{background:#f9fafb}
       </div>
     </div>
 
-    <!-- Monthly trend chart — each year a line -->
-    <div class="card" style="margin-bottom:18px">
-      <div class="sec-lbl" id="lbl-ops-trend">Monthly Trend — Revenue / Mile</div>
-      <div style="position:relative;height:300px"><canvas id="chart-ops-trend"></canvas></div>
+    <!-- Per Mile trend charts -->
+    <div style="margin-bottom:8px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Per Mile Trends</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+      <div class="card"><div class="sec-lbl">Revenue / Mile</div><div style="position:relative;height:200px"><canvas id="chart-ops-rpm"></canvas></div></div>
+      <div class="card"><div class="sec-lbl">Fuel Cost / Mile</div><div style="position:relative;height:200px"><canvas id="chart-ops-fpm"></canvas></div></div>
+      <div class="card"><div class="sec-lbl">Maint. Cost / Mile</div><div style="position:relative;height:200px"><canvas id="chart-ops-spm"></canvas></div></div>
+    </div>
+    <!-- Per Bus Day trend charts -->
+    <div style="margin-bottom:8px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Per Bus Day Trends</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">
+      <div class="card"><div class="sec-lbl">Revenue / Bus Day</div><div style="position:relative;height:200px"><canvas id="chart-ops-rpd"></canvas></div></div>
+      <div class="card"><div class="sec-lbl">Fuel Cost / Bus Day</div><div style="position:relative;height:200px"><canvas id="chart-ops-fpd"></canvas></div></div>
+      <div class="card"><div class="sec-lbl">Maint. Cost / Bus Day</div><div style="position:relative;height:200px"><canvas id="chart-ops-spd"></canvas></div></div>
     </div>
   </div>
 
@@ -1011,15 +1015,15 @@ function renderMonthlyTable(filteredRows) {
     }
   }
 
-  var COL_CY="#253047", COL_PLAN="#1b4d2e", COL_PY="#4a3010";
+  var COL_CY="#1e293b", COL_PLAN="#15803d", COL_PY="#b45309";
   var thead='<thead>'
     +'<tr>'
     +'<th class="tl" rowspan="2" style="vertical-align:middle">Month</th>'
     +'<th class="tr" style="background:'+COL_CY+'">CY</th>'
     +'<th class="tr" style="background:'+COL_PLAN+'">Plan</th>'
-    +'<th class="tr" style="background:'+COL_PLAN+'">CY vs Plan</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">vs Plan %</th>'
     +'<th class="tr" style="background:'+COL_PY+'">PY</th>'
-    +'<th class="tr" style="background:'+COL_PY+'">CY vs PY</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">vs PY %</th>'
     +'</tr></thead>';
 
   var totCY=0,totPY=0,totPlan=0;
@@ -1029,22 +1033,22 @@ function renderMonthlyTable(filteredRows) {
     var vsP=yoy(cyv,plv), vsY=yoy(cyv,pyv);
     return '<tr>'
       +'<td class="tl cb">'+name+'</td>'
-      +'<td class="tr" style="background:rgba(37,48,71,.04)">'+( cyv?fmt$(cyv):"—")+'</td>'
-      +'<td class="tr" style="background:rgba(27,77,46,.04)">'+( plv!=null?fmt$(plv):"—")+'</td>'
-      +'<td class="tr '+colorClass(vsP)+'" style="background:rgba(27,77,46,.04)">'+(cyv||plv?fmtPct(vsP):"—")+'</td>'
-      +'<td class="tr" style="background:rgba(74,48,16,.04)">'+( pyv?fmt$(pyv):"—")+'</td>'
-      +'<td class="tr '+colorClass(vsY)+'" style="background:rgba(74,48,16,.04)">'+(cyv||pyv?fmtPct(vsY):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(30,41,59,.04)">'+( cyv?fmt$(cyv):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(21,128,61,.06)">'+( plv!=null?fmt$(plv):"—")+'</td>'
+      +'<td class="tr '+colorClass(vsP)+'" style="background:rgba(21,128,61,.06)">'+(cyv||plv?fmtPct(vsP):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(180,83,9,.06)">'+( pyv?fmt$(pyv):"—")+'</td>'
+      +'<td class="tr '+colorClass(vsY)+'" style="background:rgba(180,83,9,.06)">'+(cyv||pyv?fmtPct(vsY):"—")+'</td>'
       +'</tr>';
   }).join("");
 
   var gtVsP=yoy(totCY,totPlan), gtVsY=yoy(totCY,totPY);
   var gtRow='<tr style="background:#f3f4f6;font-weight:700">'
     +'<td class="tl" style="font-weight:800">Total</td>'
-    +'<td class="tr" style="background:rgba(37,48,71,.07)">'+fmt$(totCY)+'</td>'
-    +'<td class="tr" style="background:rgba(27,77,46,.07)">'+(totPlan?fmt$(totPlan):"—")+'</td>'
-    +'<td class="tr '+colorClass(gtVsP)+'" style="background:rgba(27,77,46,.07)">'+(totPlan?fmtPct(gtVsP):"—")+'</td>'
-    +'<td class="tr" style="background:rgba(74,48,16,.07)">'+fmt$(totPY)+'</td>'
-    +'<td class="tr '+colorClass(gtVsY)+'" style="background:rgba(74,48,16,.07)">'+fmtPct(gtVsY)+'</td>'
+    +'<td class="tr" style="background:rgba(30,41,59,.07)">'+fmt$(totCY)+'</td>'
+    +'<td class="tr" style="background:rgba(21,128,61,.10)">'+(totPlan?fmt$(totPlan):"—")+'</td>'
+    +'<td class="tr '+colorClass(gtVsP)+'" style="background:rgba(21,128,61,.10)">'+(totPlan?fmtPct(gtVsP):"—")+'</td>'
+    +'<td class="tr" style="background:rgba(180,83,9,.10)">'+fmt$(totPY)+'</td>'
+    +'<td class="tr '+colorClass(gtVsY)+'" style="background:rgba(180,83,9,.10)">'+fmtPct(gtVsY)+'</td>'
     +'</tr>';
 
   el.innerHTML='<table>'+thead+'<tbody>'+rows+gtRow+'</tbody></table>';
@@ -1089,7 +1093,7 @@ function renderMonthlyChart(filteredRows) {
     type:"line",
     data:{labels:MO,datasets:datasets},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{font:{family:"Outfit",size:12},color:"#6b7a99",boxWidth:22}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+(c.parsed.y!=null?"$"+Math.round(c.parsed.y).toLocaleString():"—");}}}},
+      plugins:{legend:{labels:{font:{family:"Inter",size:12},color:"#6b7a99",usePointStyle:true,pointStyle:"line",boxWidth:30}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+(c.parsed.y!=null?"$"+Math.round(c.parsed.y).toLocaleString():"—");}}}},
       scales:{x:{grid:{display:false},ticks:BIG_TICK},y:{grid:GRID_STYLE,ticks:Object.assign({},BIG_TICK,{callback:function(v){return "$"+(v/1000).toFixed(0)+"k";}})}}
     }
   });
@@ -1130,16 +1134,16 @@ function breakdownTable(curr, prior, groupKey, elId, labelTxt, allowedKeys, plan
     return hasAny&&total>0 ? total : null;
   }
 
-  var COL_CY="#253047", COL_PLAN="#1b4d2e", COL_PY="#4a3010", COL_TR="#1a3a5c";
+  var COL_CY="#1e293b", COL_PLAN="#15803d", COL_PY="#b45309", COL_TR="#1a3a5c";
 
   var thead='<thead>'
     +'<tr>'
     +'<th class="tl" rowspan="2" style="vertical-align:middle">'+labelTxt+'</th>'
     +'<th class="tr" style="background:'+COL_CY+'">CY Rev</th>'
     +'<th class="tr" style="background:'+COL_PLAN+'">Plan</th>'
-    +'<th class="tr" style="background:'+COL_PLAN+'">CY vs Plan</th>'
+    +'<th class="tr" style="background:'+COL_PLAN+'">vs Plan %</th>'
     +'<th class="tr" style="background:'+COL_PY+'">PY Rev</th>'
-    +'<th class="tr" style="background:'+COL_PY+'">CY vs PY</th>'
+    +'<th class="tr" style="background:'+COL_PY+'">vs PY %</th>'
     +'</tr></thead>';
 
   var totCR=0,totPR=0,totPlan=0;
@@ -1151,11 +1155,11 @@ function breakdownTable(curr, prior, groupKey, elId, labelTxt, allowedKeys, plan
     var rVsP=yoy(c.rev,planVal), rVsY=yoy(c.rev,p.rev);
     totCR+=c.rev; totPR+=p.rev; if(planVal!=null) totPlan+=planVal;
     return '<tr><td class="tl cb">'+k+'</td>'
-      +'<td class="tr" style="background:rgba(37,48,71,.04)">'+fmt$(c.rev)+'</td>'
-      +'<td class="tr" style="background:rgba(27,77,46,.04)">'+(planVal!=null?fmt$(planVal):"—")+'</td>'
-      +'<td class="tr '+colorClass(rVsP)+'" style="background:rgba(27,77,46,.04)">'+(planVal!=null?fmtPct(rVsP):"—")+'</td>'
-      +'<td class="tr" style="background:rgba(74,48,16,.04)">'+fmt$(p.rev)+'</td>'
-      +'<td class="tr '+colorClass(rVsY)+'" style="background:rgba(74,48,16,.04)">'+fmtPct(rVsY)+'</td>'
+      +'<td class="tr" style="background:rgba(30,41,59,.04)">'+fmt$(c.rev)+'</td>'
+      +'<td class="tr" style="background:rgba(21,128,61,.06)">'+(planVal!=null?fmt$(planVal):"—")+'</td>'
+      +'<td class="tr '+colorClass(rVsP)+'" style="background:rgba(21,128,61,.06)">'+(planVal!=null?fmtPct(rVsP):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(180,83,9,.06)">'+fmt$(p.rev)+'</td>'
+      +'<td class="tr '+colorClass(rVsY)+'" style="background:rgba(180,83,9,.06)">'+fmtPct(rVsY)+'</td>'
       +'</tr>';
   }).join("");
 
@@ -1190,7 +1194,21 @@ function opsPassTripTypeLoc(r) {
 }
 
 // ── OPS DATA ─────────────────────────────────────────────────
-function buildOpsData() {
+// targetYr scopes to one calendar year; uses same YTD month/day cutoff for all years.
+// This ensures KPI cards and table grand totals use identical data.
+function buildOpsData(targetYr) {
+  if(targetYr===undefined) targetYr=CY;
+  function dateOk(date) {
+    if(!date) return false;
+    if(date.getFullYear()!==targetYr) return false;
+    return opsDatePassYTD(date);
+  }
+  function utilDateOk(dateKey) {
+    var parts=dateKey.split("-");
+    if(+parts[0]!==targetYr) return false;
+    return opsDatePassYTD(new Date(+parts[0],+parts[1]-1,+parts[2]));
+  }
+
   var groups={};
   var allG=new Set();
   enrichedCharter.forEach(function(r){ allG.add(r._grp); });
@@ -1199,38 +1217,32 @@ function buildOpsData() {
   enrichedUtil.forEach(function(r){ allG.add(r._grp); });
   allG.forEach(function(g){ if(validFleet(g)) groups[g]={rev:0,miles:0,fuel:0,svc:0,busDays:0}; });
 
-  // Charter Revenue drives ops revenue + miles
   enrichedCharter.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]) return;
-    if(!opsDatePassYTD(r._date)) return;
+    if(!dateOk(r._date)) return;
     if(!opsPassTripTypeLoc(r)) return;
     if(r._revenue) groups[g].rev+=r._revenue;
-    if(r._miles) groups[g].miles+=r._miles;
+    if(r._miles)   groups[g].miles+=r._miles;
   });
-
-  // Vehicle Utilization drives Bus Days
   enrichedUtil.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]) return;
-    var parts=r._dateKey.split("-");
-    var d=new Date(+parts[0],+parts[1]-1,+parts[2]);
-    if(!opsDatePassYTD(d)) return;
-    groups[g].busDays += r._busDayVal;
+    if(!utilDateOk(r._dateKey)) return;
+    groups[g].busDays+=r._busDayVal;
   });
-
   enrichedFuel.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]||!r._cost) return;
-    if(!opsDatePassYTD(r._date)) return;
+    if(!dateOk(r._date)) return;
     groups[g].fuel+=r._cost;
   });
   enrichedService.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]||!r._cost) return;
-    if(!opsDatePassYTD(r._date)) return;
+    if(!dateOk(r._date)) return;
     groups[g].svc+=r._cost;
   });
 
   return Object.keys(groups).map(function(group){
     var v=groups[group];
-    var bd=Math.round(v.busDays*10)/10; // one decimal for fractional days
+    var bd=Math.round(v.busDays*10)/10;
     return {
       group:group,
       revenue:Math.round(v.rev), miles:Math.round(v.miles),
@@ -1307,7 +1319,7 @@ function buildOpsDataByYear(fleetFilter) {
 function renderOpsTables(opsData) {
   var vis=FLEET_FILT==="all"?opsData:opsData.filter(function(d){return d.group===FLEET_FILT;});
 
-  // ── Grand totals (weighted averages for per-unit metrics) ──
+  // ── Grand totals (weighted averages — same formula used for KPI cards) ──
   function grandTotals(arr) {
     var tRev=0,tMiles=0,tFuel=0,tSvc=0,tBd=0;
     arr.forEach(function(d){ tRev+=d.revenue||0; tMiles+=d.miles||0; tFuel+=d.fuel||0; tSvc+=d.svc||0; tBd+=d.busDays||0; });
@@ -1318,6 +1330,10 @@ function renderOpsTables(opsData) {
   }
 
   var gt=grandTotals(vis);
+  // ── PY via same buildOpsData path for apples-to-apples comparison ──
+  var pyOpsData=buildOpsData(PY);
+  var pyVis=FLEET_FILT==="all"?pyOpsData:pyOpsData.filter(function(d){return d.group===FLEET_FILT;});
+  var gtPY=grandTotals(pyVis);
 
   // ── Per Mile table ──
   var pm=document.getElementById("tbl-permile");
@@ -1341,49 +1357,8 @@ function renderOpsTables(opsData) {
     pd.innerHTML='<table><thead><tr><th class="tl">Fleet Group</th><th class="tr">Rev / Bus Day</th><th class="tr">Fuel / Bus Day</th><th class="tr">Maint. / Bus Day</th></tr></thead><tbody>'+rows2+gtRow2+'</tbody></table>';
   }
 
-  // ── KPI cards: CY vs PY for all 6 metrics (top of ops tab) ──
-  // Build CY and PY totals from enriched data for YoY comparison
-  function opsYearTotals(yr) {
-    var t={rev:0,miles:0,fuel:0,svc:0,busDays:0};
-    enrichedCharter.forEach(function(r){
-      if(!r._date||r._date.getFullYear()!==yr) return;
-      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
-      if(!opsDatePassYTD(r._date)) return;
-      if(!opsPassTripTypeLoc(r)) return;
-      t.rev+=r._revenue||0; t.miles+=r._miles||0;
-    });
-    enrichedUtil.forEach(function(r){
-      var ry=+r._dateKey.split("-")[0];
-      if(ry!==yr) return;
-      if(!validFleet(r._grp)) return;
-      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
-      var parts=r._dateKey.split("-");
-      var d=new Date(+parts[0],+parts[1]-1,+parts[2]);
-      if(!opsDatePassYTD(d)) return;
-      t.busDays+=r._busDayVal||0;
-    });
-    enrichedFuel.forEach(function(r){
-      if(!r._date||r._date.getFullYear()!==yr) return;
-      if(!validFleet(r._grp)) return;
-      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
-      if(!opsDatePassYTD(r._date)) return;
-      t.fuel+=r._cost||0;
-    });
-    enrichedService.forEach(function(r){
-      if(!r._date||r._date.getFullYear()!==yr) return;
-      if(!validFleet(r._grp)) return;
-      if(FLEET_FILT!=="all"&&r._grp!==FLEET_FILT) return;
-      if(!opsDatePassYTD(r._date)) return;
-      t.svc+=r._cost||0;
-    });
-    var bd=t.busDays;
-    return {
-      rpm:t.miles>0?t.rev/t.miles:null,   fpm:t.miles>0?t.fuel/t.miles:null,  spm:t.miles>0?t.svc/t.miles:null,
-      rpd:bd>0?t.rev/bd:null,              fpd:bd>0?t.fuel/bd:null,             spd:bd>0?t.svc/bd:null
-    };
-  }
-
-  var cy=opsYearTotals(CY), py=opsYearTotals(PY);
+  // ── KPI cards: CY = grand total already computed; PY via same path ──
+  var cy=gt, py=gtPY;
   var kpiDefs=[
     {key:"rpm",lbl:"Revenue / Mile",     fmtFn:function(v){return fmt$(v,2);}, cls:"ct"},
     {key:"fpm",lbl:"Fuel Cost / Mile",   fmtFn:function(v){return fmt$(v,2);}, cls:"cr"},
@@ -1498,31 +1473,28 @@ function buildOpsDataByMonth(fleetFilter, metric) {
   return result;
 }
 
-function renderOpsTrendChart() {
-  var meta = OPS_METRIC_META[OPS_METRIC];
+function renderOneOpsTrendChart(metricKey, canvasId) {
+  var meta = OPS_METRIC_META[metricKey];
   var MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  var YEAR_COLORS = ["#254B71","#3a95a8","#c97a1a","#2e7d52","#c0392b","#7b6fa0","#888"];
-  var byMonth = buildOpsDataByMonth(FLEET_FILT, OPS_METRIC);
+  var YEAR_COLORS = ["#1e40af","#0ea5e9","#f59e0b","#16a34a","#ef4444","#7c3aed","#888"];
+  var byMonth = buildOpsDataByMonth(FLEET_FILT, metricKey);
   var years = Object.keys(byMonth).sort();
 
-  document.getElementById("lbl-ops-trend").textContent =
-    "Monthly Trend — " + meta.lbl + (FLEET_FILT!=="all"?" · "+FLEET_FILT:"");
-
-  destroyChart("ops-trend");
-  var ctx = document.getElementById("chart-ops-trend");
+  destroyChart("ops-"+metricKey);
+  var ctx = document.getElementById(canvasId);
   if(!ctx||!years.length) return;
 
-  var BIG_TICK = {color:"#6b7a99",font:{family:"Outfit",size:12}};
+  var TICK = {color:"#9ca3af",font:{family:"Inter",size:10}};
   var datasets = years.map(function(yr, i){
     var isCY = (+yr===CY);
     return {
       label: String(yr),
       data:  byMonth[yr],
-      borderColor:      YEAR_COLORS[i % YEAR_COLORS.length],
-      backgroundColor:  isCY ? "rgba(37,75,113,.07)" : "transparent",
-      borderWidth:      isCY ? 3 : 2,
-      borderDash:       isCY ? [] : [5,4],
-      pointRadius:      isCY ? 4 : 2,
+      borderColor:          YEAR_COLORS[i % YEAR_COLORS.length],
+      backgroundColor:      isCY ? "rgba(30,64,175,.07)" : "transparent",
+      borderWidth:          isCY ? 2.5 : 1.5,
+      borderDash:           isCY ? [] : [5,4],
+      pointRadius:          isCY ? 3 : 1,
       pointBackgroundColor: YEAR_COLORS[i % YEAR_COLORS.length],
       tension: 0.3,
       fill:  isCY,
@@ -1530,26 +1502,31 @@ function renderOpsTrendChart() {
     };
   });
 
-  CHARTS["ops-trend"] = new Chart(ctx.getContext("2d"), {
+  CHARTS["ops-"+metricKey] = new Chart(ctx.getContext("2d"), {
     type:"line",
     data:{ labels:MO, datasets:datasets },
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{
-        legend:{labels:{font:{family:"Outfit",size:12},color:"#6b7a99",boxWidth:24}},
+        legend:{labels:{font:{family:"Inter",size:10},color:"#6b7280",usePointStyle:true,pointStyle:"line",boxWidth:30,padding:8}},
         tooltip:{callbacks:{label:function(c){
           return c.dataset.label+": "+(c.parsed.y!=null?meta.fmt(c.parsed.y):"—");
         }}}
       },
       scales:{
-        x:{grid:{display:false},ticks:BIG_TICK},
-        y:{grid:GRID_STYLE,ticks:Object.assign({},BIG_TICK,{callback:function(v){ return meta.fmt(v); }})}
+        x:{grid:{display:false},ticks:TICK},
+        y:{grid:GRID_STYLE,ticks:Object.assign({},TICK,{callback:function(v){ return meta.fmt(v); }})}
       }
     }
   });
 }
 
 function renderAllOpsCharts() {
-  renderOpsTrendChart();
+  renderOneOpsTrendChart("rpm","chart-ops-rpm");
+  renderOneOpsTrendChart("fpm","chart-ops-fpm");
+  renderOneOpsTrendChart("spm","chart-ops-spm");
+  renderOneOpsTrendChart("rpd","chart-ops-rpd");
+  renderOneOpsTrendChart("fpd","chart-ops-fpd");
+  renderOneOpsTrendChart("spd","chart-ops-spd");
 }
 
 // ── DATA INSPECTOR ────────────────────────────────────────────
@@ -1637,15 +1614,72 @@ function showTab(name) {
   document.getElementById("period-desc").style.display    = revOnly ? "" : "none";
 }
 
-// ── LOAD ALL (sequential — one request at a time) ───────────────
-function loadAll() {
-  document.getElementById("loading").style.display = "flex";
-  document.getElementById("loading-msg").textContent = "LOADING DATA SOURCES — Please wait ~25s";
-  document.getElementById("loading-detail").textContent = "Starting…";
-  ["tab-revenue","tab-operations","tab-data"].forEach(function(id) {
-    document.getElementById(id).style.display = "none";
-  });
+// ── CACHE ────────────────────────────────────────────────────
+var CACHE_KEY       = "dash_csv_cache_v1";
+var CACHE_MAX_AGE   = 60 * 60 * 1000;   // 1 hour in ms
 
+function saveCache(rawResults) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      data: rawResults
+    }));
+  } catch(e) { console.warn("Cache write failed:", e); }
+}
+
+function loadCache() {
+  try {
+    var raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function cacheAgeLabel(ts) {
+  var diff = Math.round((Date.now() - ts) / 60000);
+  if (diff < 1)  return "just now";
+  if (diff < 60) return diff + "m ago";
+  return Math.round(diff/60) + "h ago";
+}
+
+function setStatusBar(msg, isLive) {
+  var el = document.getElementById("refresh-time");
+  el.innerHTML = (isLive
+    ? "<span style='color:#16a34a;font-weight:600'>● Live</span> &nbsp;" + msg
+    : "<span style='color:#f59e0b;font-weight:600'>◎ Cached</span> &nbsp;" + msg);
+}
+
+// ── FINALIZE (apply raw CSV results → DATA, then render) ──────
+function finalizeResults(rawResults, fromCache, cacheTs) {
+  DATA.bookings    = rawResults.bookings    || [];
+  DATA.fleet       = parseFleet(rawResults.fleet || []);
+  DATA.fuel        = rawResults.fuel        || [];
+  DATA.service     = rawResults.service     || [];
+  DATA.charter     = rawResults.charter     || [];
+  DATA.utilization = parseUtilization(rawResults.utilization || []);
+  DATA.plan        = parsePlan(rawResults.plan || []);
+
+  enrichAll();
+  var opsData = buildOpsData();
+  populateDropdowns(opsData);
+  render();
+
+  document.getElementById("loading").style.display = "none";
+  showTab("revenue");
+
+  if (fromCache) {
+    setStatusBar("cached " + cacheAgeLabel(cacheTs) + " — refreshing in background…", false);
+  } else {
+    var t = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+    setStatusBar("fetched at " + t, true);
+    saveCache(rawResults);
+    // Update status after save
+    setStatusBar("fetched at " + t, true);
+  }
+}
+
+// ── FETCH ALL SOURCES sequentially ────────────────────────────
+function fetchAllSources(onComplete, onProgress, silent) {
   var queue = [
     { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings" },
     { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments" },
@@ -1653,55 +1687,76 @@ function loadAll() {
     { key:"service",     url:URLS.service,     header:true,  label:"Service History" },
     { key:"charter",     url:URLS.charter,     header:true,  label:"Charter Revenue" },
     { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization" },
-    { key:"plan",         url:URLS.plan,         header:false, label:"2026 Plan" }
+    { key:"plan",        url:URLS.plan,        header:false, label:"2026 Plan" }
   ];
-  var results = {};
-  var qIdx = 0;
+  var results = {}, qIdx = 0;
 
   function loadNext() {
-    if (qIdx >= queue.length) {
-      finalize();
-      return;
-    }
+    if (qIdx >= queue.length) { onComplete(results); return; }
     var item = queue[qIdx];
-    document.getElementById("loading-detail").textContent =
-      "(" + (qIdx+1) + "/7) Fetching " + item.label + "…";
-
+    if (onProgress) onProgress(qIdx + 1, queue.length, item.label);
     fetchCSV(item.url, item.header, function(data) {
       results[item.key] = data;
       var rows = data.length;
-      var status = rows > 0 ? "✓ " + rows + " rows" : "✗ 0 rows — check sheet is published";
-      var color = rows > 0 ? "#16a34a" : "#c0392b";
-      document.getElementById("loading-detail").textContent =
-        "(" + (qIdx+1) + "/7) " + item.label + " — " + status;
-      var logEl = document.getElementById("load-log");
-      logEl.innerHTML += "<span style='color:" + color + "'>" + status + "</span>  " + item.label + "<br>";
+      var ok   = rows > 0;
+      if (!silent) {
+        var color = ok ? "#16a34a" : "#c0392b";
+        var status = ok ? "✓ " + rows + " rows" : "✗ 0 rows";
+        document.getElementById("load-log").innerHTML +=
+          "<span style='color:" + color + "'>" + status + "</span>  " + item.label + "<br>";
+      }
       qIdx++;
-      setTimeout(loadNext, 2500);  // codetabs rate-limits if hit too fast
+      setTimeout(loadNext, 2500);
     });
   }
+  loadNext();
+}
 
-  function finalize() {
-    DATA.bookings    = results.bookings    || [];
-    DATA.fleet       = parseFleet(results.fleet || []);
-    DATA.fuel        = results.fuel        || [];
-    DATA.service     = results.service     || [];
-    DATA.charter     = results.charter     || [];
-    DATA.utilization = parseUtilization(results.utilization || []);
-    DATA.plan        = parsePlan(results.plan || []);
+// ── LOAD ALL — entry point with cache logic ───────────────────
+function loadAll(forceRefresh) {
+  var cached = loadCache();
+  var cacheValid = cached && (Date.now() - cached.ts) < CACHE_MAX_AGE;
 
-    enrichAll();
-    var opsData = buildOpsData();
-    populateDropdowns(opsData);
-    render();
-
+  if (!forceRefresh && cached) {
+    // Show cached data immediately (no blank screen)
     document.getElementById("loading").style.display = "none";
-    showTab("revenue");
-    document.getElementById("refresh-time").textContent =
-      "↻ " + new Date().toLocaleTimeString();
+    finalizeResults(cached.data, true, cached.ts);
+
+    if (!cacheValid) {
+      // Cache is stale — silently refresh in background
+      setTimeout(function() {
+        setStatusBar("cache stale — fetching fresh data…", false);
+        fetchAllSources(
+          function(results) { finalizeResults(results, false, null); },
+          null,
+          true  // silent (no load-log updates)
+        );
+      }, 500);
+    } else {
+      // Cache is fresh — just update the label periodically
+      setStatusBar("cached " + cacheAgeLabel(cached.ts), false);
+    }
+    return;
   }
 
-  loadNext();
+  // No cache or force-refresh: show loading screen and fetch live
+  document.getElementById("loading").style.display = "flex";
+  document.getElementById("loading-msg").textContent =
+    forceRefresh ? "REFRESHING DATA…" : "LOADING DATA SOURCES — Please wait ~25s";
+  document.getElementById("loading-detail").textContent = "Starting…";
+  document.getElementById("load-log").innerHTML = "";
+  ["tab-revenue","tab-operations","tab-data"].forEach(function(id){
+    document.getElementById(id).style.display = "none";
+  });
+
+  fetchAllSources(
+    function(results) { finalizeResults(results, false, null); },
+    function(n, total, label) {
+      document.getElementById("loading-detail").textContent =
+        "(" + n + "/" + total + ") Fetching " + label + "…";
+    },
+    false
+  );
 }
 
 // ── CONNECTION TEST ──────────────────────────────────────────
@@ -1800,15 +1855,12 @@ document.getElementById("sel-fleet").addEventListener("change",function(e){
   renderOpsTables(opsData);
   renderAllOpsCharts();
 });
-document.getElementById("sel-ops-metric").addEventListener("change",function(){
-  OPS_METRIC=this.value;
-  renderOpsTrendChart();
-});
-document.getElementById("btn-refresh").addEventListener("click",loadAll);
+
+document.getElementById("btn-refresh").addEventListener("click", function(){ loadAll(true); });
 document.getElementById("btn-conntest").addEventListener("click", runConnectionTest);
 
 // ── START ─────────────────────────────────────────────────────
-loadAll();
+loadAll(false);
 </script>
 </body>
 </html>

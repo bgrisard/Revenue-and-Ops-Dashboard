@@ -241,6 +241,10 @@ tbody tr:hover{background:#f9fafb}
       <button id="btn-conntest" style="background:#7c3aed;border:none;color:#fff;border-radius:7px;padding:8px 16px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:1px;font-family:'Inter',sans-serif">RUN CONNECTION TEST</button>
       <span style="font-size:11px;color:#6b7a99">Tests each URL with each proxy — open browser console (F12) for full details</span>
     </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-lbl">Cache Status (IndexedDB)</div>
+      <div id="cache-debug" style="font-size:12px;color:var(--muted)">Checking\u2026</div>
+    </div>
     <div id="conn-test-results" style="display:none;margin-bottom:18px"></div>
     <div class="inspector-grid" id="inspector-grid"></div>
   </div>
@@ -761,20 +765,30 @@ function enrichAll() {
 
   // ── Fuel History: drives fuel cost ──
   enrichedFuel = DATA.fuel.map(function(r){
-    var vid  = r["Vehicle Name"];
-    var cost = parseMoney(r["Total (USD)"]);
-    var date = parseD(r["Date (Central Time (US & Canada))"]);
-    var grp  = (vid&&date) ? getGroup(vid,date) : "Unknown";
-    return Object.assign({},r,{_vid:vid,_cost:cost,_date:date,_grp:grp});
+    // vehicle name — try exact dot-notation first, fall back to fuzzy match
+    var vid = r["vehicle.name"] || gv(r, ["vehicle.name","Vehicle Name","vehicle_name","VehicleName","name"]);
+    // cost — cents field divided by 100; fall back to direct dollar field
+    var rawCents = r["total_amount_cents"];
+    var cost;
+    if (rawCents != null && rawCents !== "") {
+      var cents = parseMoney(rawCents);
+      cost = (cents != null) ? cents / 100 : null;
+    } else {
+      cost = parseMoney(gv(r, ["total_amount_cents","Total (USD)","total_usd","total","amount"]));
+    }
+    // date — try exact 'date' key first, then fuzzy
+    var date = parseD(r["date"]) || parseD(gv(r, ["date","Date","trip_date","started_at"]));
+    var grp  = (vid && date) ? getGroup(vid, date) : "Unknown";
+    return Object.assign({}, r, {_vid:vid, _cost:cost, _date:date, _grp:grp});
   }).filter(function(r){ return r._vid; });
 
   // ── Service History: drives maintenance cost ──
   enrichedService = DATA.service.map(function(r){
-    var vid  = r["Vehicle Name"];
-    var cost = parseMoney(r["Subtotal (USD)"]);
-    var date = parseD(r["Started At"]);
-    var grp  = (vid&&date) ? getGroup(vid,date) : "Unknown";
-    return Object.assign({},r,{_vid:vid,_cost:cost,_date:date,_grp:grp});
+    var vid  = r["vehicle_name"] || gv(r, ["vehicle_name","Vehicle Name","vehicle.name","VehicleName"]);
+    var cost = parseMoney(r["subtotal"]) || parseMoney(gv(r, ["subtotal","Subtotal (USD)","subtotal_usd","total","amount"]));
+    var date = parseD(r["started_at"]) || parseD(gv(r, ["started_at","Started At","start_date","date","Date"]));
+    var grp  = (vid && date) ? getGroup(vid, date) : "Unknown";
+    return Object.assign({}, r, {_vid:vid, _cost:cost, _date:date, _grp:grp});
   }).filter(function(r){ return r._vid; });
 
   // ── Join Charter → Bookings to get _type and _loc on charter rows ──
@@ -1541,6 +1555,33 @@ function renderInspector() {
     {name:"2026 Plan",count:Object.keys((DATA.plan&&DATA.plan.total)||{}).length+" months",keys:Object.keys((DATA.plan&&DATA.plan.total)||{}).length?["Col A=Year","Col B=Month","Row 1=Category","Row 2=Label","Values=Revenue"]:[]}
   ];
 
+  // ── Field resolution diagnostic ──
+  var fuelRow   = DATA.fuel   && DATA.fuel.length   ? DATA.fuel[0]   : null;
+  var svcRow    = DATA.service && DATA.service.length ? DATA.service[0] : null;
+  function resolvedField(row, candidates) {
+    if (!row) return '<em>no data</em>';
+    for (var i=0; i<candidates.length; i++) {
+      if (row[candidates[i]] !== undefined) return '<strong>' + candidates[i] + '</strong> = ' + String(row[candidates[i]]).slice(0,40);
+    }
+    return '<span style="color:#ef4444">NOT FOUND — tried: ' + candidates.join(', ') + '</span>';
+  }
+  var diagHtml = '<div class="card" style="margin-bottom:16px;border-left:3px solid #f59e0b">'
+    + '<div class="sec-lbl" style="color:#b45309">Field Resolution Diagnostic</div>'
+    + '<table style="font-size:11px;width:100%;border-collapse:collapse">'
+    + '<thead><tr><th class="tl" style="background:#1e293b;color:#fff;padding:6px 10px">Source</th>'
+    + '<th class="tl" style="background:#1e293b;color:#fff;padding:6px 10px">Field</th>'
+    + '<th class="tl" style="background:#1e293b;color:#fff;padding:6px 10px">Resolved From</th></tr></thead><tbody>'
+    + '<tr><td class="tl" style="padding:6px 10px">Fuel</td><td class="tl" style="padding:6px 10px">vehicle (vid)</td><td class="tl" style="padding:6px 10px">' + resolvedField(fuelRow, ["vehicle.name","Vehicle Name","vehicle_name"]) + '</td></tr>'
+    + '<tr style="background:#f9fafb"><td class="tl" style="padding:6px 10px">Fuel</td><td class="tl" style="padding:6px 10px">cost (cents)</td><td class="tl" style="padding:6px 10px">' + resolvedField(fuelRow, ["total_amount_cents","Total (USD)","total"]) + '</td></tr>'
+    + '<tr><td class="tl" style="padding:6px 10px">Fuel</td><td class="tl" style="padding:6px 10px">date</td><td class="tl" style="padding:6px 10px">' + resolvedField(fuelRow, ["date","Date","trip_date"]) + '</td></tr>'
+    + '<tr style="background:#f9fafb"><td class="tl" style="padding:6px 10px">Service</td><td class="tl" style="padding:6px 10px">vehicle (vid)</td><td class="tl" style="padding:6px 10px">' + resolvedField(svcRow, ["vehicle_name","Vehicle Name","vehicle.name"]) + '</td></tr>'
+    + '<tr><td class="tl" style="padding:6px 10px">Service</td><td class="tl" style="padding:6px 10px">cost</td><td class="tl" style="padding:6px 10px">' + resolvedField(svcRow, ["subtotal","Subtotal (USD)","total"]) + '</td></tr>'
+    + '<tr style="background:#f9fafb"><td class="tl" style="padding:6px 10px">Service</td><td class="tl" style="padding:6px 10px">date</td><td class="tl" style="padding:6px 10px">' + resolvedField(svcRow, ["started_at","Started At","date"]) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:10px;font-size:11px;color:var(--muted)">Showing first row of each source. Bold = column actually found in data.</div>'
+    + '</div>';
+  document.getElementById("inspector-grid").insertAdjacentHTML("beforebegin", diagHtml);
+
   var html=sources.map(function(s){
     var ok=s.keys.length>0;
     return '<div class="ds-card" style="'+(ok?"":"border-color:rgba(220,38,38,.3)")+'">'
@@ -1612,27 +1653,65 @@ function showTab(name) {
   var revOnly = (name==="revenue");
   document.getElementById("fb-period-mode").style.display = revOnly ? "" : "none";
   document.getElementById("period-desc").style.display    = revOnly ? "" : "none";
+  if (name === "data") updateCacheDebug();
 }
 
-// ── CACHE ────────────────────────────────────────────────────
-var CACHE_KEY       = "dash_csv_cache_v1";
-var CACHE_MAX_AGE   = 60 * 60 * 1000;   // 1 hour in ms
+// ── CACHE (IndexedDB — no size limit, survives tab discard) ──
+var CACHE_DB_NAME   = "DashboardCache";
+var CACHE_DB_VER    = 1;
+var CACHE_STORE     = "snapshots";
+var CACHE_KEY       = "main";
+var CACHE_MAX_AGE   = 8 * 60 * 60 * 1000;  // 8 hours
+
+var _db = null;
+
+function openDB(cb) {
+  if (_db) { cb(_db); return; }
+  var req = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VER);
+  req.onupgradeneeded = function(e) {
+    e.target.result.createObjectStore(CACHE_STORE, { keyPath: "id" });
+  };
+  req.onsuccess = function(e) {
+    _db = e.target.result;
+    cb(_db);
+  };
+  req.onerror = function() {
+    console.warn("IndexedDB open failed:", req.error);
+    cb(null);
+  };
+}
 
 function saveCache(rawResults) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      ts: Date.now(),
-      data: rawResults
-    }));
-  } catch(e) { console.warn("Cache write failed:", e); }
+  openDB(function(db) {
+    if (!db) { console.warn("Cache: no DB available"); return; }
+    var tx = db.transaction(CACHE_STORE, "readwrite");
+    var st = tx.objectStore(CACHE_STORE);
+    st.put({ id: CACHE_KEY, ts: Date.now(), data: rawResults });
+    tx.oncomplete = function() {
+      console.log("Cache saved to IndexedDB at", new Date().toLocaleTimeString());
+      updateCacheDebug();
+    };
+    tx.onerror = function() { console.warn("Cache write failed:", tx.error); };
+  });
 }
 
-function loadCache() {
-  try {
-    var raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch(e) { return null; }
+function loadCache(cb) {
+  openDB(function(db) {
+    if (!db) { cb(null); return; }
+    var tx  = db.transaction(CACHE_STORE, "readonly");
+    var req = tx.objectStore(CACHE_STORE).get(CACHE_KEY);
+    req.onsuccess = function() { cb(req.result || null); };
+    req.onerror   = function() { cb(null); };
+  });
+}
+
+function clearCache(cb) {
+  openDB(function(db) {
+    if (!db) { if (cb) cb(); return; }
+    var tx = db.transaction(CACHE_STORE, "readwrite");
+    tx.objectStore(CACHE_STORE).delete(CACHE_KEY);
+    tx.oncomplete = function() { if (cb) cb(); updateCacheDebug(); };
+  });
 }
 
 function cacheAgeLabel(ts) {
@@ -1645,8 +1724,29 @@ function cacheAgeLabel(ts) {
 function setStatusBar(msg, isLive) {
   var el = document.getElementById("refresh-time");
   el.innerHTML = (isLive
-    ? "<span style='color:#16a34a;font-weight:600'>● Live</span> &nbsp;" + msg
-    : "<span style='color:#f59e0b;font-weight:600'>◎ Cached</span> &nbsp;" + msg);
+    ? "<span style='color:#16a34a;font-weight:600'>\u25cf Live</span> &nbsp;" + msg
+    : "<span style='color:#f59e0b;font-weight:600'>\u25ce Cached</span> &nbsp;" + msg);
+}
+
+function updateCacheDebug() {
+  var el = document.getElementById("cache-debug");
+  if (!el) return;
+  loadCache(function(entry) {
+    if (!entry) {
+      el.innerHTML = "<span style='color:#ef4444'>No cache stored yet. Load data once to populate.</span>";
+    } else {
+      var age   = cacheAgeLabel(entry.ts);
+      var fresh = (Date.now() - entry.ts) < CACHE_MAX_AGE;
+      var keys  = Object.keys(entry.data || {});
+      el.innerHTML = "<span style='color:" + (fresh?"#16a34a":"#f59e0b") + ";font-weight:600'>"
+        + (fresh ? "\u25cf Fresh" : "\u25ce Stale") + "</span>"
+        + " &nbsp; Saved <strong>" + age + "</strong>"
+        + " &nbsp;\u00b7&nbsp; Sources: " + keys.join(", ")
+        + " &nbsp; <button onclick='clearCache(function(){location.reload();})'"
+        + " style='font-size:10px;padding:2px 10px;border:1px solid #e5e7eb;border-radius:6px;"
+        + "background:#fff;cursor:pointer;font-family:Inter,sans-serif'>Clear &amp; Reload</button>";
+    }
+  });
 }
 
 // ── FINALIZE (apply raw CSV results → DATA, then render) ──────
@@ -1714,49 +1814,65 @@ function fetchAllSources(onComplete, onProgress, silent) {
 
 // ── LOAD ALL — entry point with cache logic ───────────────────
 function loadAll(forceRefresh) {
-  var cached = loadCache();
-  var cacheValid = cached && (Date.now() - cached.ts) < CACHE_MAX_AGE;
-
-  if (!forceRefresh && cached) {
-    // Show cached data immediately (no blank screen)
-    document.getElementById("loading").style.display = "none";
-    finalizeResults(cached.data, true, cached.ts);
-
-    if (!cacheValid) {
-      // Cache is stale — silently refresh in background
-      setTimeout(function() {
-        setStatusBar("cache stale — fetching fresh data…", false);
-        fetchAllSources(
-          function(results) { finalizeResults(results, false, null); },
-          null,
-          true  // silent (no load-log updates)
-        );
-      }, 500);
-    } else {
-      // Cache is fresh — just update the label periodically
-      setStatusBar("cached " + cacheAgeLabel(cached.ts), false);
-    }
+  if (forceRefresh) {
+    // Force refresh: show loading screen immediately then fetch
+    _showLoadingScreen("REFRESHING DATA…");
+    fetchAllSources(
+      function(results) { finalizeResults(results, false, null); },
+      function(n, total, label) {
+        document.getElementById("loading-detail").textContent =
+          "(" + n + "/" + total + ") Fetching " + label + "\u2026";
+      },
+      false
+    );
     return;
   }
 
-  // No cache or force-refresh: show loading screen and fetch live
+  // Check IndexedDB cache async
+  loadCache(function(cached) {
+    var cacheValid = cached && (Date.now() - cached.ts) < CACHE_MAX_AGE;
+
+    if (cached) {
+      // Render from cache immediately — no blank screen
+      document.getElementById("loading").style.display = "none";
+      finalizeResults(cached.data, true, cached.ts);
+
+      if (!cacheValid) {
+        // Stale — silently refresh in background after render
+        setTimeout(function() {
+          setStatusBar("cache stale \u2014 refreshing in background\u2026", false);
+          fetchAllSources(
+            function(results) { finalizeResults(results, false, null); },
+            null,
+            true
+          );
+        }, 800);
+      } else {
+        setStatusBar("cached " + cacheAgeLabel(cached.ts), false);
+      }
+    } else {
+      // No cache — fetch live
+      _showLoadingScreen("LOADING DATA SOURCES \u2014 Please wait ~25s");
+      fetchAllSources(
+        function(results) { finalizeResults(results, false, null); },
+        function(n, total, label) {
+          document.getElementById("loading-detail").textContent =
+            "(" + n + "/" + total + ") Fetching " + label + "\u2026";
+        },
+        false
+      );
+    }
+  });
+}
+
+function _showLoadingScreen(msg) {
   document.getElementById("loading").style.display = "flex";
-  document.getElementById("loading-msg").textContent =
-    forceRefresh ? "REFRESHING DATA…" : "LOADING DATA SOURCES — Please wait ~25s";
-  document.getElementById("loading-detail").textContent = "Starting…";
+  document.getElementById("loading-msg").textContent = msg;
+  document.getElementById("loading-detail").textContent = "Starting\u2026";
   document.getElementById("load-log").innerHTML = "";
   ["tab-revenue","tab-operations","tab-data"].forEach(function(id){
     document.getElementById(id).style.display = "none";
   });
-
-  fetchAllSources(
-    function(results) { finalizeResults(results, false, null); },
-    function(n, total, label) {
-      document.getElementById("loading-detail").textContent =
-        "(" + n + "/" + total + ") Fetching " + label + "…";
-    },
-    false
-  );
 }
 
 // ── CONNECTION TEST ──────────────────────────────────────────

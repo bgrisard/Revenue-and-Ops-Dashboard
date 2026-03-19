@@ -134,7 +134,11 @@ tbody tr:hover{background:#f9fafb}
 
   <!-- REVENUE TAB -->
   <div id="tab-revenue" class="tab-panel">
-    <div id="kpi-row">
+    <!-- Full-width section header -->
+    <div style="background:var(--thead);border-radius:12px 12px 0 0;padding:12px 20px;margin-bottom:0">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#fff;text-transform:uppercase">Current Year Bookings</div>
+    </div>
+    <div id="kpi-row" style="border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:14px;background:#fff;margin-bottom:18px;display:flex;gap:12px;flex-wrap:wrap">
       <div class="kpi-card">
         <div class="kpi-lbl" id="kl-rev">Current Revenue</div>
         <div class="kpi-val" id="kv-rev">—</div>
@@ -181,6 +185,32 @@ tbody tr:hover{background:#f9fafb}
           <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Breakdown by Location</div>
         </div>
         <div class="tbl-wrap" id="tbl-loc"></div>
+      </div>
+    </div>
+
+    <!-- ── FORWARD BOOKINGS ─────────────────────────────────── -->
+    <div style="margin-top:22px">
+      <!-- Full-width section header -->
+      <div style="background:var(--thead);border-radius:12px 12px 0 0;padding:12px 20px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#fff;text-transform:uppercase">Next 12 Months Bookings</div>
+        <div id="fwd-period-note" style="font-size:10px;color:rgba(255,255,255,.6);font-family:'Inter',monospace"></div>
+      </div>
+      <!-- KPI cards full-width -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-top:none;border-radius:0;margin-bottom:16px" id="fwd-kpi-row"></div>
+      <!-- Chart + Table -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+        <div class="card">
+          <div class="sec-lbl">Monthly Booked Revenue</div>
+          <div style="position:relative;height:220px"><canvas id="chart-forward"></canvas></div>
+          <div class="sec-lbl" style="margin-top:20px">Cumulative Booked Revenue</div>
+          <div style="position:relative;height:220px"><canvas id="chart-forward-cumul"></canvas></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="background:var(--thead);padding:11px 18px">
+            <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;text-transform:uppercase">Monthly Detail</div>
+          </div>
+          <div class="tbl-wrap" id="tbl-forward"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -344,13 +374,12 @@ function isValidCSV(txt, header) {
 function fetchCSV(url, header, cb) {
   var shortLabel = url.split("PACX")[1] ? ("PACX"+url.split("PACX")[1]).slice(0,20) : url.slice(50,70);
 
-  // Proxy order: codetabs works for large files; allorigins as fallback
-  // corsproxy skipped — returns 413 on files > ~1MB
+  // allorigins has no size limit and handles Google's redirects well — use it first.
+  // codetabs is fast but caps at ~1MB (truncates large sheets) — use as fallback only.
   var proxies = [
-    { name:"codetabs",  url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
-    { name:"allorigins",url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) },
-    { name:"codetabs2", url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
-    { name:"direct",    url:url }
+    { name:"allorigins", url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) },
+    { name:"codetabs",   url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
+    { name:"allorigins2",url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) }
   ];
   var idx = 0;
 
@@ -361,19 +390,17 @@ function fetchCSV(url, header, cb) {
       return;
     }
     var proxy = proxies[idx++];
-    var delay = retryDelay || 0;
     setTimeout(function() {
       console.log("Trying " + proxy.name + " for " + shortLabel);
       var xhr = new XMLHttpRequest();
       xhr.open("GET", proxy.url, true);
-      xhr.timeout = 30000;
+      xhr.timeout = 35000;
       xhr.onload = function() {
         var txt = xhr.responseText;
-        console.log(proxy.name, "status:", xhr.status, "length:", txt ? txt.length : 0, "first:", txt ? txt.trim().charAt(0) : "");
+        console.log(proxy.name, "status:", xhr.status, "bytes:", txt ? txt.length : 0, "rows~:", txt ? txt.split("\n").length : 0);
         if (xhr.status === 429) {
-          // Rate limited — wait 3 seconds and retry same proxy
-          console.warn(proxy.name + " rate limited (429), waiting 3s then retrying...");
-          idx--; // rewind so we retry same proxy
+          console.warn(proxy.name + " rate limited, waiting 3s…");
+          idx--;
           tryNext(3000);
         } else if (xhr.status >= 200 && xhr.status < 300 && isValidCSV(txt, header)) {
           var result = Papa.parse(txt, { header: header, skipEmptyLines: true });
@@ -384,13 +411,140 @@ function fetchCSV(url, header, cb) {
           tryNext(0);
         }
       };
-      xhr.onerror = function() { console.warn(proxy.name + " network error"); tryNext(0); };
-      xhr.ontimeout = function() { console.warn(proxy.name + " timed out"); tryNext(0); };
+      xhr.onerror   = function() { console.warn(proxy.name + " network error"); tryNext(0); };
+      xhr.ontimeout = function() { console.warn(proxy.name + " timed out");     tryNext(0); };
       xhr.send();
-    }, delay);
+    }, retryDelay || 0);
   }
 
   tryNext();
+}
+
+
+// ── FETCH LARGE CSV IN CHUNKS ─────────────────────────────────
+// Fetches a published Google Sheet in row-range slices so that
+// no single request exceeds proxy size limits.
+// Stops when a chunk returns 0 rows OR fewer than CHUNK_SIZE rows.
+// Each chunk is retried across multiple proxies before giving up.
+function fetchChunkedCSV(url, colEnd, header, cb) {
+  var CHUNK_SIZE  = 3000;  // rows per request — allorigins handles up to ~2MB fine
+  var PROXY_DELAY = 200;   // ms between proxy attempts within a chunk
+  var CHUNK_DELAY = 300;   // ms between consecutive chunks (avoids rate limiting)
+  var allRows     = [];
+  var chunkIdx    = 0;
+
+  function buildProxies(rangeUrl) {
+    return [
+      "https://api.allorigins.win/raw?url="     + encodeURIComponent(rangeUrl),
+      "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(rangeUrl),
+      "https://api.allorigins.win/raw?url="     + encodeURIComponent(rangeUrl)  // retry allorigins
+    ];
+  }
+
+  function fetchChunk() {
+    // Row math: chunk 0 = rows 1–1501 (includes header row 1)
+    //           chunk 1 = rows 2–1502 (header re-included, PapaParse reads it; data rows 2-1501)
+    // We always include row 1 (header) in every chunk so PapaParse can name columns.
+    var dataStart = chunkIdx * CHUNK_SIZE + 1;  // first DATA row for this chunk (1-based)
+    var dataEnd   = dataStart + CHUNK_SIZE - 1;
+    // Range: always start from row 1 (header) + dataStart-1 ... but simpler:
+    // Send range A1:colEnd(dataEnd) for chunk 0, then A1:colEnd(dataEnd) with header=true
+    // Actually cleanest: always include row 1 in range, PapaParse uses it as header.
+    var startRow  = chunkIdx === 0 ? 1 : 1;          // always include header row
+    var endRow    = dataEnd;
+    // But to avoid re-fetching earlier rows, use skiprows via range on subsequent chunks:
+    // Chunk 0: A1:BU1501  (rows 1-1501 = header + 1500 data rows)
+    // Chunk 1: A1502:BU3002 — but we need header! So we prepend row 1.
+    // Simplest correct approach: for chunk>0, fetch A1:colEnd1 (header only) + AX:colEndY (data)
+    // — too complex. Instead, for all chunks: fetch A(dataStart):colEnd(dataEnd) with header=false
+    // and manually attach the headers captured from chunk 0.
+
+    var rangeUrl;
+    if (chunkIdx === 0) {
+      rangeUrl = url + "&range=A1:" + colEnd + (CHUNK_SIZE + 1);
+    } else {
+      rangeUrl = url + "&range=A" + (dataStart + 1) + ":" + colEnd + (dataEnd + 1);
+      // +1 because row 1 is header, so data row 1 is sheet row 2
+    }
+
+    var proxies = buildProxies(rangeUrl);
+    var pi = 0;
+    var headers0 = allRows.length > 0 ? Object.keys(allRows[0]) : null;
+
+    console.log("fetchChunked chunk", chunkIdx, "range rows", dataStart, "-", dataEnd, "url-suffix:", rangeUrl.slice(-30));
+
+    function tryProxy() {
+      if (pi >= proxies.length) {
+        console.warn("fetchChunked: all proxies failed chunk", chunkIdx, "— stopping with", allRows.length, "rows so far");
+        cb(allRows);
+        return;
+      }
+      var proxyUrl = proxies[pi++];
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", proxyUrl, true);
+      xhr.timeout = 40000;
+      xhr.onload = function() {
+        var txt = xhr.responseText || "";
+        if (xhr.status === 429) { pi--; setTimeout(tryProxy, 3000); return; }
+        if (xhr.status < 200 || xhr.status >= 300) { setTimeout(tryProxy, PROXY_DELAY); return; }
+        var fc = txt.trim().charAt(0);
+        if (fc === "<" || fc === "{" || fc === "[") { setTimeout(tryProxy, PROXY_DELAY); return; }
+
+        var parsed;
+        if (chunkIdx === 0) {
+          parsed = Papa.parse(txt, { header: header, skipEmptyLines: true });
+        } else {
+          // For subsequent chunks on header:true sheets — range doesn't include the header row,
+          // so parse without header and manually assign column names from chunk 0.
+          // For header:false sheets — parse as raw arrays and concat directly.
+          parsed = Papa.parse(txt, { header: false, skipEmptyLines: true });
+          if (header && headers0 && parsed.data && parsed.data.length > 0) {
+            var rawRows = parsed.data;
+            var objRows = [];
+            for (var ri = 0; ri < rawRows.length; ri++) {
+              var obj = {};
+              for (var ci = 0; ci < headers0.length; ci++) {
+                obj[headers0[ci]] = rawRows[ri][ci] !== undefined ? rawRows[ri][ci] : "";
+              }
+              objRows.push(obj);
+            }
+            parsed = { data: objRows };
+          }
+        }
+
+        var rows = parsed.data || [];
+        console.log("fetchChunked chunk", chunkIdx, "proxy", pi, "got", rows.length, "rows");
+
+        if (rows.length === 0) {
+          console.log("fetchChunked: empty chunk", chunkIdx, "— done. Total:", allRows.length);
+          cb(allRows);
+          return;
+        }
+
+        // On chunk 0 capture headers for subsequent chunks (header:true sheets only)
+        if (header && chunkIdx === 0 && rows.length > 0) {
+          headers0 = Object.keys(rows[0]);
+        }
+
+        allRows = allRows.concat(rows);
+        chunkIdx++;
+
+        if (rows.length < CHUNK_SIZE) {
+          console.log("fetchChunked: short chunk", chunkIdx-1, "("+rows.length+" rows) — done. Total:", allRows.length);
+          cb(allRows);
+        } else {
+          setTimeout(fetchChunk, CHUNK_DELAY);
+        }
+      };
+      xhr.onerror   = function() { console.warn("fetchChunked proxy error");   setTimeout(tryProxy, PROXY_DELAY); };
+      xhr.ontimeout = function() { console.warn("fetchChunked proxy timeout"); setTimeout(tryProxy, PROXY_DELAY); };
+      xhr.send();
+    }
+
+    tryProxy();
+  }
+
+  fetchChunk();
 }
 
 // ── PARSE FLEET ───────────────────────────────────────────────
@@ -1582,6 +1736,89 @@ function renderInspector() {
     + '</div>';
   document.getElementById("inspector-grid").insertAdjacentHTML("beforebegin", diagHtml);
 
+  // ── Service History deep-dive panel ──
+  var svcRows = DATA.service || [];
+  var svcEnriched = enrichedService || [];
+
+  // Count rows with valid cost / date / vid
+  var svcWithVid=0, svcWithCost=0, svcWithDate=0, svcWithAll=0;
+  svcEnriched.forEach(function(r){
+    var hasVid=!!r._vid, hasCost=(r._cost!=null&&r._cost!==0), hasDate=!!r._date;
+    if(hasVid) svcWithVid++;
+    if(hasCost) svcWithCost++;
+    if(hasDate) svcWithDate++;
+    if(hasVid&&hasCost&&hasDate) svcWithAll++;
+  });
+
+  // Year breakdown of enriched service rows
+  var svcByYear={};
+  svcEnriched.forEach(function(r){
+    if(!r._date||!r._cost) return;
+    var yr=r._date.getFullYear();
+    svcByYear[yr]=(svcByYear[yr]||0)+r._cost;
+  });
+
+  // Show all actual column names in the raw data
+  var svcCols = svcRows.length ? Object.keys(svcRows[0]) : [];
+
+  // Sample first 3 rows — key fields
+  var sampleFields = ["vehicle_name","Vehicle Name","vehicle.name","subtotal","Subtotal (USD)","started_at","Started At","date"];
+  var svcSample = svcRows.slice(0,3).map(function(r,i){
+    return '<tr style="'+(i%2?'background:#f9fafb':'')+'">'
+      +'<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:10px">#'+(i+1)+'</td>'
+      + sampleFields.map(function(f){
+          var v = r[f];
+          return '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;font-size:10px;max-width:120px;overflow:hidden;white-space:nowrap">'
+            + (v!==undefined ? String(v).slice(0,30) : '<span style="color:#d1d5db">—</span>') + '</td>';
+        }).join('')
+      +'</tr>';
+  }).join('');
+
+  var svcHtml = '<div class="card" style="margin-bottom:16px;border-left:3px solid #ef4444">'
+    + '<div class="sec-lbl" style="color:#dc2626">Service History — Load Diagnostics</div>'
+
+    // Row counts
+    + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">'
+    + ['Raw rows loaded', 'Enriched rows', 'With vehicle', 'With cost ≠ 0', 'With date'].map(function(lbl,i){
+        var vals=[svcRows.length, svcEnriched.length, svcWithVid, svcWithCost, svcWithDate];
+        var ok = vals[i] > 0;
+        return '<div style="background:'+(ok?'#f0fdf4':'#fef2f2')+';border:1px solid '+(ok?'#bbf7d0':'#fecaca')+';border-radius:8px;padding:10px 12px">'
+          +'<div style="font-size:9px;font-weight:600;letter-spacing:1px;color:'+(ok?'#15803d':'#dc2626')+';text-transform:uppercase;margin-bottom:4px">'+lbl+'</div>'
+          +'<div style="font-size:18px;font-weight:700;color:'+(ok?'#15803d':'#dc2626')+'">'+vals[i]+'</div>'
+          +'</div>';
+      }).join('')
+    + '</div>'
+
+    // Year breakdown
+    + '<div style="margin-bottom:14px"><strong style="font-size:11px">Cost by year (enriched):</strong> '
+    + (Object.keys(svcByYear).length
+        ? Object.keys(svcByYear).sort().map(function(yr){ return yr+': <strong>'+fmt$(svcByYear[yr])+'</strong>'; }).join(' &nbsp;·&nbsp; ')
+        : '<span style="color:#ef4444">No rows with both date + cost resolved</span>')
+    + '</div>'
+
+    // All column names
+    + '<div style="margin-bottom:12px"><strong style="font-size:11px">All columns in raw data ('+svcCols.length+'):</strong><br>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'
+    + svcCols.map(function(c){
+        var isKey = ["vehicle_name","subtotal","started_at"].indexOf(c) >= 0;
+        return '<span style="font-size:10px;padding:2px 8px;border-radius:4px;font-family:Inter,monospace;'
+          + (isKey ? 'background:#dcfce7;color:#15803d;font-weight:700' : 'background:#f3f4f6;color:#6b7280')
+          + '">' + c + '</span>';
+      }).join('')
+    + '</div></div>'
+
+    // Sample rows
+    + (svcSample ? '<div><strong style="font-size:11px">First 3 rows — key fields:</strong>'
+      + '<div style="overflow-x:auto;margin-top:6px"><table style="font-size:10px;border-collapse:collapse;width:100%">'
+      + '<thead><tr><th style="background:#1e293b;color:#fff;padding:5px 10px;text-align:left">#</th>'
+      + sampleFields.map(function(f){ return '<th style="background:#1e293b;color:#fff;padding:5px 10px;text-align:left;white-space:nowrap">'+f+'</th>'; }).join('')
+      + '</tr></thead><tbody>' + svcSample + '</tbody></table></div></div>'
+      : '<p style="color:#ef4444;font-size:11px">No raw service rows to inspect.</p>')
+
+    + '</div>';
+
+  document.getElementById("inspector-grid").insertAdjacentHTML("beforebegin", svcHtml);
+
   var html=sources.map(function(s){
     var ok=s.keys.length>0;
     return '<div class="ds-card" style="'+(ok?"":"border-color:rgba(220,38,38,.3)")+'">'
@@ -1601,6 +1838,250 @@ function renderInspector() {
     +'</tbody></table></div>';
 
   document.getElementById("inspector-grid").innerHTML=html;
+}
+
+
+// ── FORWARD BOOKINGS ─────────────────────────────────────────
+// CY window:  StartDate in [TODAY, TODAY+365], BookingDate <= TODAY
+// LY window:  StartDate in [TODAY-365, TODAY], BookingDate <= TODAY-365
+function buildForwardBookings() {
+  var MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var todayMs = TODAY.getTime();
+  var cy_start = TODAY;
+  var cy_end   = new Date(todayMs + 365*24*60*60*1000);
+  var ly_end   = TODAY;                                          // LY tripDate end = today
+  var ly_start = new Date(todayMs - 365*24*60*60*1000);         // LY tripDate start = today-365
+  var ly_bkCutoff = ly_start;                                    // LY bookingDate <= today-365
+
+  // Bucket by calendar month of StartDate
+  // We need 12 buckets keyed by "YYYY-MM" in trip-date order
+  var cyMap = {}, lyMap = {};
+
+  enrichedBk.forEach(function(r){
+    if(!r._tripDate || !r._revenue) return;
+    // Apply trip type / location filters
+    if(TRIP_TYPE !== "all" && r._type !== TRIP_TYPE) return;
+    if(LOC       !== "all" && r._loc  !== LOC)       return;
+
+    var td  = r._tripDate;
+    var bd  = r._bookingDate;
+    var tdMs = td.getTime();
+    var ym  = td.getFullYear() + "-" + String(td.getMonth()+1).padStart(2,"0");
+
+    // CY Forward: trip starts today→today+365, booked on or before today
+    if(tdMs >= cy_start.getTime() && tdMs <= cy_end.getTime()) {
+      if(bd && bd <= TODAY) {
+        if(!cyMap[ym]) cyMap[ym] = {rev:0, trips:new Set()};
+        cyMap[ym].rev += r._revenue;
+        if(r._hireId) cyMap[ym].trips.add(r._hireId);
+        else          cyMap[ym].trips.add(r);
+      }
+    }
+
+    // LY Forward: trip starts today-365→today, booked on or before today-365
+    if(tdMs >= ly_start.getTime() && tdMs <= ly_end.getTime()) {
+      if(bd && bd <= ly_bkCutoff) {
+        if(!lyMap[ym]) lyMap[ym] = {rev:0, trips:new Set()};
+        lyMap[ym].rev += r._revenue;
+        if(r._hireId) lyMap[ym].trips.add(r._hireId);
+        else          lyMap[ym].trips.add(r);
+      }
+    }
+  });
+
+  // Build ordered 12-month arrays starting from THIS month for CY,
+  // and starting from THIS month last year for LY
+  function buildMonths(anchorDate, map) {
+    var months = [], labels = [];
+    for(var i=0; i<12; i++){
+      var d = new Date(anchorDate.getFullYear(), anchorDate.getMonth()+i, 1);
+      var ym = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      months.push(map[ym] || {rev:0, trips:new Set()});
+      labels.push(MO[d.getMonth()]+" '"+ String(d.getFullYear()).slice(2));
+    }
+    return {months:months, labels:labels};
+  }
+
+  var lyAnchor = new Date(TODAY.getFullYear()-1, TODAY.getMonth(), 1);
+  var cy = buildMonths(TODAY, cyMap);
+  var ly = buildMonths(lyAnchor, lyMap);
+
+  return {
+    cyLabels: cy.labels,  // e.g. ["Mar '26", "Apr '26", ...]
+    lyLabels: ly.labels,  // e.g. ["Mar '25", "Apr '25", ...]
+    cy: cy.months,
+    ly: ly.months,
+    cyTotal: Object.values(cyMap).reduce(function(s,v){return s+v.rev;},0),
+    lyTotal: Object.values(lyMap).reduce(function(s,v){return s+v.rev;},0),
+    cyTrips: Object.values(cyMap).reduce(function(s,v){return s+v.trips.size;},0),
+    lyTrips: Object.values(lyMap).reduce(function(s,v){return s+v.trips.size;},0)
+  };
+}
+
+function renderForwardBookings() {
+  var d = buildForwardBookings();
+  if(!d) return;
+
+  // ── Period note ──
+  var fmt = function(dt){ return dt.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
+  var cy_end = new Date(TODAY.getTime()+365*24*60*60*1000);
+  var ly_start = new Date(TODAY.getTime()-365*24*60*60*1000);
+  document.getElementById("fwd-period-note").textContent =
+    "CY: "+fmt(TODAY)+" – "+fmt(cy_end)+" · LY: "+fmt(ly_start)+" – "+fmt(TODAY);
+
+  // ── KPI summary ──
+  var revChg = yoy(d.cyTotal, d.lyTotal);
+  var tripChg = yoy(d.cyTrips, d.lyTrips);
+  var cyAvg = d.cyTrips > 0 ? d.cyTotal / d.cyTrips : null;
+  var lyAvg = d.lyTrips > 0 ? d.lyTotal / d.lyTrips : null;
+  var kpiData = [
+    {lbl:"CY Booked Revenue", val:fmt$(d.cyTotal), sub:pillHTML(revChg)+" vs PY "+fmt$(d.lyTotal)},
+    {lbl:"CY Booked Trips",   val:fmtN(d.cyTrips), sub:pillHTML(tripChg)+" vs PY "+fmtN(d.lyTrips)},
+    {lbl:"Avg Rev / Trip",    val:fmt$(cyAvg),      sub:"LY: "+fmt$(lyAvg)}
+  ];
+  document.getElementById("fwd-kpi-row").innerHTML = kpiData.map(function(k,i){
+    var borderL = i>0 ? "border-left:1px solid var(--border);" : "";
+    return '<div style="padding:14px 20px;'+borderL+'background:#fff">'
+      +'<div style="font-size:9px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">'+k.lbl+'</div>'
+      +'<div style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.3px">'+k.val+'</div>'
+      +'<div style="font-size:11px;margin-top:5px;color:var(--muted)">'+k.sub+'</div>'
+      +'</div>';
+  }).join("");
+
+  // ── Chart ──
+  destroyChart("forward");
+  var ctx = document.getElementById("chart-forward");
+  if(!ctx) return;
+
+  // Use the CY labels on x-axis (Mar '26, Apr '26, ...)
+  var labels = d.cyLabels;
+  var CY_COLOR = "#1e40af";
+  var LY_COLOR = "#0ea5e9";
+
+  CHARTS["forward"] = new Chart(ctx.getContext("2d"), {
+    type:"line",
+    data:{
+      labels: labels,
+      datasets:[
+        {
+          label: "CY (Next 12)",
+          data: d.cy.map(function(m){ return m.rev > 0 ? m.rev : null; }),
+          borderColor: CY_COLOR, backgroundColor:"rgba(30,64,175,.07)",
+          borderWidth:2.5, pointRadius:4, pointBackgroundColor:CY_COLOR,
+          tension:0.3, fill:true, spanGaps:true
+        },
+        {
+          label: "LY (Prev 12)",
+          data: d.ly.map(function(m){ return m.rev > 0 ? m.rev : null; }),
+          borderColor: LY_COLOR, backgroundColor:"transparent",
+          borderWidth:1.5, borderDash:[5,4], pointRadius:2, pointBackgroundColor:LY_COLOR,
+          tension:0.3, fill:false, spanGaps:true
+        }
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{font:{family:"Inter",size:11},color:"#6b7280",usePointStyle:true,pointStyle:"line",boxWidth:30}},
+        tooltip:{callbacks:{label:function(c){
+          return c.dataset.label+": "+(c.parsed.y!=null?fmt$(c.parsed.y):"—");
+        }}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:"#9ca3af",font:{family:"Inter",size:10}}},
+        y:{grid:{color:"#f3f4f6"},ticks:{color:"#9ca3af",font:{family:"Inter",size:10},
+            callback:function(v){ return "$"+Math.round(v/1000)+"k"; }}}
+      }
+    }
+  });
+
+  // ── Cumulative chart ──
+  destroyChart("forward-cumul");
+  var ctxC = document.getElementById("chart-forward-cumul");
+  if(ctxC) {
+    var cyData = d.cy.map(function(m){ return m.rev > 0 ? m.rev : 0; });
+    var lyData = d.ly.map(function(m){ return m.rev > 0 ? m.rev : 0; });
+    var cyCumul = [], lyCumul = [];
+    var cySum = 0, lySum = 0;
+    for(var ci=0; ci<12; ci++){
+      cySum += cyData[ci]; cyCumul.push(cySum > 0 ? cySum : null);
+      lySum += lyData[ci]; lyCumul.push(lySum > 0 ? lySum : null);
+    }
+    CHARTS["forward-cumul"] = new Chart(ctxC.getContext("2d"), {
+      type:"line",
+      data:{
+        labels: labels,
+        datasets:[
+          {
+            label:"CY (Next 12)",
+            data: cyCumul,
+            borderColor: CY_COLOR, backgroundColor:"rgba(30,64,175,.07)",
+            borderWidth:2.5, pointRadius:3, pointBackgroundColor:CY_COLOR,
+            tension:0.3, fill:true, spanGaps:true
+          },
+          {
+            label:"LY (Prev 12)",
+            data: lyCumul,
+            borderColor: LY_COLOR, backgroundColor:"transparent",
+            borderWidth:1.5, borderDash:[5,4], pointRadius:2, pointBackgroundColor:LY_COLOR,
+            tension:0.3, fill:false, spanGaps:true
+          }
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{font:{family:"Inter",size:11},color:"#6b7280",usePointStyle:true,pointStyle:"line",boxWidth:30}},
+          tooltip:{callbacks:{label:function(c){
+            return c.dataset.label+": "+(c.parsed.y!=null?fmt$(c.parsed.y):"—");
+          }}}
+        },
+        scales:{
+          x:{grid:{display:false},ticks:{color:"#9ca3af",font:{family:"Inter",size:10}}},
+          y:{grid:{color:"#f3f4f6"},ticks:{color:"#9ca3af",font:{family:"Inter",size:10},
+              callback:function(v){ return "$"+Math.round(v/1000)+"k"; }}}
+        }
+      }
+    });
+  }
+
+  // ── Table ──
+  var COL_CY = "#1e293b", COL_LY = "#15803d";
+  var thead = '<thead><tr>'
+    +'<th class="tl">Month</th>'
+    +'<th class="tr" style="background:'+COL_CY+'">CY Rev</th>'
+    +'<th class="tr" style="background:'+COL_CY+'">CY Trips</th>'
+    +'<th class="tr" style="background:'+COL_LY+'">PY Rev</th>'
+    +'<th class="tr" style="background:'+COL_LY+'">PY Trips</th>'
+    +'<th class="tr" style="background:'+COL_LY+'">vs PY %</th>'
+    +'</tr></thead>';
+
+  var totCY=0,totLY=0,totCT=0,totLT=0;
+  var rows = labels.map(function(lbl,i){
+    var cy = d.cy[i], ly = d.ly[i];
+    var cyR = cy.rev, lyR = ly.rev, cyT = cy.trips.size, lyT = ly.trips.size;
+    totCY+=cyR; totLY+=lyR; totCT+=cyT; totLT+=lyT;
+    var chg = yoy(cyR, lyR);
+    return '<tr>'
+      +'<td class="tl cb">'+lbl+'</td>'
+      +'<td class="tr" style="background:rgba(30,41,59,.04)">'+(cyR?fmt$(cyR):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(30,41,59,.04)">'+(cyT?fmtN(cyT):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(21,128,61,.05)">'+(lyR?fmt$(lyR):"—")+'</td>'
+      +'<td class="tr" style="background:rgba(21,128,61,.05)">'+(lyT?fmtN(lyT):"—")+'</td>'
+      +'<td class="tr '+colorClass(chg)+'" style="background:rgba(21,128,61,.05)">'+(cyR||lyR?fmtPct(chg):"—")+'</td>'
+      +'</tr>';
+  }).join("");
+
+  var gtChg = yoy(totCY, totLY);
+  var gtRow = '<tr style="background:#f3f4f6;font-weight:700">'
+    +'<td class="tl">Total</td>'
+    +'<td class="tr">'+fmt$(totCY)+'</td>'
+    +'<td class="tr">'+fmtN(totCT)+'</td>'
+    +'<td class="tr">'+fmt$(totLY)+'</td>'
+    +'<td class="tr">'+fmtN(totLT)+'</td>'
+    +'<td class="tr '+colorClass(gtChg)+'">'+fmtPct(gtChg)+'</td>'
+    +'</tr>';
+
+  document.getElementById("tbl-forward").innerHTML =
+    '<table>'+thead+'<tbody>'+rows+gtRow+'</tbody></table>';
 }
 
 // ── FULL RENDER ───────────────────────────────────────────────
@@ -1638,6 +2119,7 @@ function render() {
   renderMonthlyTable(allYearsFiltered);
   breakdownTable(filtered.curr, filtered.prior, "_type", "tbl-type", "Trip Type", ["1Day Trips","Multi-day"], DATA.plan&&DATA.plan.byType);
   breakdownTable(filtered.curr, filtered.prior, "_loc",  "tbl-loc",  "Location",  null,                              DATA.plan&&DATA.plan.byLoc);
+  renderForwardBookings();
   var opsData=buildOpsData();
   renderOpsTables(opsData);
   renderAllOpsCharts();
@@ -1778,38 +2260,56 @@ function finalizeResults(rawResults, fromCache, cacheTs) {
   }
 }
 
-// ── FETCH ALL SOURCES sequentially ────────────────────────────
+// ── FETCH ALL SOURCES in parallel ────────────────────────────
+// Small sheets → single request (fast).
+// Large sheets (fuel, service) → chunked to get all rows.
+// All sources kick off simultaneously with a small stagger to avoid
+// hammering allorigins with 7 simultaneous requests.
 function fetchAllSources(onComplete, onProgress, silent) {
-  var queue = [
-    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings" },
-    { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments" },
-    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History" },
-    { key:"service",     url:URLS.service,     header:true,  label:"Service History" },
-    { key:"charter",     url:URLS.charter,     header:true,  label:"Charter Revenue" },
-    { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization" },
-    { key:"plan",        url:URLS.plan,        header:false, label:"2026 Plan" }
+  var sources = [
+    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:false },
+    { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments",   chunked:false },
+    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:true,  colEnd:"AM" },
+    { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:true,  colEnd:"BU" },
+    { key:"charter",     url:URLS.charter,     header:true,  label:"Charter Revenue",     chunked:false },
+    { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization", chunked:false },
+    { key:"plan",        url:URLS.plan,        header:false, label:"2026 Plan",           chunked:false }
   ];
-  var results = {}, qIdx = 0;
 
-  function loadNext() {
-    if (qIdx >= queue.length) { onComplete(results); return; }
-    var item = queue[qIdx];
-    if (onProgress) onProgress(qIdx + 1, queue.length, item.label);
-    fetchCSV(item.url, item.header, function(data) {
-      results[item.key] = data;
-      var rows = data.length;
-      var ok   = rows > 0;
-      if (!silent) {
-        var color = ok ? "#16a34a" : "#c0392b";
-        var status = ok ? "✓ " + rows + " rows" : "✗ 0 rows";
-        document.getElementById("load-log").innerHTML +=
-          "<span style='color:" + color + "'>" + status + "</span>  " + item.label + "<br>";
-      }
-      qIdx++;
-      setTimeout(loadNext, 2500);
-    });
+  var results  = {};
+  var done     = 0;
+  var total    = sources.length;
+
+  function onSourceDone(item, data) {
+    results[item.key] = data;
+    done++;
+    var rows = data.length;
+    var ok   = rows > 0;
+    if (!silent) {
+      var color  = ok ? "#16a34a" : "#c0392b";
+      var status = ok ? "✓ " + rows + " rows" : "✗ 0 rows";
+      var logEl  = document.getElementById("load-log");
+      if (logEl) logEl.innerHTML +=
+        "<span style='color:" + color + "'>" + status + "</span>  " + item.label + "<br>";
+    }
+    if (onProgress) onProgress(done, total, item.label);
+    if (done === total) onComplete(results);
   }
-  loadNext();
+
+  // Stagger launches 400ms apart so we don't flood allorigins
+  sources.forEach(function(item, i) {
+    setTimeout(function() {
+      if (item.chunked) {
+        fetchChunkedCSV(item.url, item.colEnd || "ZZ", item.header, function(data) {
+          onSourceDone(item, data);
+        });
+      } else {
+        fetchCSV(item.url, item.header, function(data) {
+          onSourceDone(item, data);
+        });
+      }
+    }, i * 400);
+  });
 }
 
 // ── LOAD ALL — entry point with cache logic ───────────────────

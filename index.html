@@ -286,9 +286,9 @@ tbody tr:hover{background:#f9fafb}
 var URLS = {
   bookings:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQh-BhNlFOUUBR8nc1wWuNGXCswEfB6fppsaS2TT9Z4l2scrhL6BOAEv9b1lxHx0dUd-Pi-XF7T_LdU/pub?output=csv",
   fleet:       "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHD26jPJzjg3Xv4Hr9eZrE6ReeCV4G8W2PosDsAE7utoWqGqLVGem3EX1jf9XuSzdcadDXoAraDR0K/pub?output=csv",
-  fuel:        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7jMmhDP1xcT-DzoO43ICQL4BaggGAkJsTMnHioBVGnpaXqYwchtgemy4FQGwe57PMLTyUG8ul7ogQ/pub?output=csv",
-  service:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0JSwcqFFb1AUVuIZMm8gl6Pt9kbF6PeXyFfbDDUd9s2mi-AyFSvwoyQ0xbBNw88N5yxpSeEGzvUe9/pub?output=csv",
-  charter:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCYObRTPv7DSxgi1EO-M3E5K30OaNIjnHo2nwk2iZP4F8TqeU9gnteL3VGmBnaiH7MZk7Jv5iM-7a7/pub?output=csv",
+  fuel:        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7jMmhDP1xcT-DzoO43ICQL4BaggGAkJsTMnHioBVGnpaXqYwchtgemy4FQGwe57PMLTyUG8ul7ogQ/pub?gid=1095599627&single=true&output=csv",
+  service:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0JSwcqFFb1AUVuIZMm8gl6Pt9kbF6PeXyFfbDDUd9s2mi-AyFSvwoyQ0xbBNw88N5yxpSeEGzvUe9/pub?gid=926966331&single=true&output=csv",
+  samsara:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vT0IOm7i-FR3XIBX8z6mOpzKWkZ72_-g-TilszC_OcmgOcsZF081PYoPgebh4PDGAsL47LfrlYndbRd/pub?output=csv",
   utilization: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQAlE0lDr93uwYjyn08VFA4D8GfIN6CFEnszHZgvcU7sJOtNrOzVqObUlBEQgspnJetALrUSd-p4S1k/pub?output=csv",
   plan:        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQMeZ3UuV8Ldh8FfqRr3wj6FUFWqUdmOrr6xWBV0_1vHS5SzE2fiKHd9OomA8MICitLyccEPWprndut/pub?output=csv"
 };
@@ -299,7 +299,7 @@ var MODE = "total", TRIP_TYPE = "all", LOC = "all", FLEET_FILT = "all";
 var CHARTS = {};
 var TODAY = new Date();
 var CY = TODAY.getFullYear(), PY = CY - 1;
-var enrichedBk = [], enrichedCharter = [], enrichedFuel = [], enrichedService = [], enrichedUtil = [];
+var enrichedBk = [], enrichedSamsara = [], enrichedFuel = [], enrichedService = [], enrichedUtil = [];
 
 // ── UTILS ────────────────────────────────────────────────────
 function scrub(s){ return String(s||"").toLowerCase().replace(/[\s_\-\/().#]/g,""); }
@@ -377,9 +377,10 @@ function fetchCSV(url, header, cb) {
   // allorigins has no size limit and handles Google's redirects well — use it first.
   // codetabs is fast but caps at ~1MB (truncates large sheets) — use as fallback only.
   var proxies = [
+    { name:"direct",     url: url },
+    { name:"corsproxy",  url:"https://corsproxy.io/?" + encodeURIComponent(url) },
     { name:"allorigins", url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) },
-    { name:"codetabs",   url:"https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) },
-    { name:"allorigins2",url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) }
+    { name:"thingproxy", url:"https://thingproxy.freeboard.io/fetch/" + url }
   ];
   var idx = 0;
 
@@ -435,9 +436,10 @@ function fetchChunkedCSV(url, colEnd, header, cb) {
 
   function buildProxies(rangeUrl) {
     return [
-      "https://api.allorigins.win/raw?url="     + encodeURIComponent(rangeUrl),
-      "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(rangeUrl),
-      "https://api.allorigins.win/raw?url="     + encodeURIComponent(rangeUrl)  // retry allorigins
+      rangeUrl,
+      "https://corsproxy.io/?"                 + encodeURIComponent(rangeUrl),
+      "https://api.allorigins.win/raw?url="    + encodeURIComponent(rangeUrl),
+      "https://thingproxy.freeboard.io/fetch/" + rangeUrl
     ];
   }
 
@@ -907,14 +909,13 @@ function enrichAll() {
     return Object.assign({},r,{_tripDate:tripDate,_bookingDate:bookingDate,_revenue:revenue,_hireId:hireId,_type:type,_loc:loc});
   }).filter(function(r){ return r._tripDate||r._bookingDate; });
 
-  // ── Charter Revenue: drives miles + ops revenue ──
-  enrichedCharter = DATA.charter.map(function(r){
-    var vid      = r["VehicleID"];
-    var miles    = parseMoney(r["Mileage"]);
-    var revenue  = parseMoney(r["Total"]);
-    var tripDate = parseD(r["StartDateTime"]);
-    var grp      = (vid&&tripDate) ? getGroup(vid,tripDate) : "Unknown";
-    return Object.assign({},r,{_vid:vid,_miles:miles,_revenue:revenue,_date:tripDate,_grp:grp});
+  // ── Samsara: drives vehicle mileage for ops metrics ──
+  enrichedSamsara = DATA.samsara.map(function(r){
+    var vid   = r["vehicle_name"];
+    var miles = parseMoney(r["miles_driven"]);
+    var date  = parseD(r["date"]);
+    var grp   = (vid&&date) ? getGroup(vid,date) : "Unknown";
+    return Object.assign({},r,{_vid:vid,_miles:miles,_date:date,_grp:grp});
   }).filter(function(r){ return r._vid; });
 
   // ── Fuel History: drives fuel cost ──
@@ -945,18 +946,7 @@ function enrichAll() {
     return Object.assign({}, r, {_vid:vid, _cost:cost, _date:date, _grp:grp});
   }).filter(function(r){ return r._vid; });
 
-  // ── Join Charter → Bookings to get _type and _loc on charter rows ──
-  // Firm Bookings has PrivateHireID; Charter Revenue may also have PrivateHireID
-  var bkMap = {};
-  enrichedBk.forEach(function(r){
-    if(r._hireId) bkMap[String(r._hireId).trim()] = {_type:r._type, _loc:r._loc};
-  });
-  enrichedCharter = enrichedCharter.map(function(r){
-    var hireId = r["PrivateHireID"] || r["PrivateHireId"] || r["privatehireid"] || "";
-    hireId = String(hireId).trim();
-    var bk = hireId ? (bkMap[hireId]||{}) : {};
-    return Object.assign({}, r, {_hireId:hireId, _type:bk._type||null, _loc:bk._loc||null});
-  });
+
 
   // ── Vehicle Utilization: drives Bus Days ──
   // DATA.utilization = { hours: {vid: {"YYYY-MM-DD": hrs}}, groups: {vid: group} }
@@ -1379,18 +1369,31 @@ function buildOpsData(targetYr) {
 
   var groups={};
   var allG=new Set();
-  enrichedCharter.forEach(function(r){ allG.add(r._grp); });
+  enrichedSamsara.forEach(function(r){ allG.add(r._grp); });
   enrichedFuel.forEach(function(r){ allG.add(r._grp); });
   enrichedService.forEach(function(r){ allG.add(r._grp); });
   enrichedUtil.forEach(function(r){ allG.add(r._grp); });
   allG.forEach(function(g){ if(validFleet(g)) groups[g]={rev:0,miles:0,fuel:0,svc:0,busDays:0}; });
+  // _rev_ bucket accumulates total booking revenue (not fleet-group-attributed)
+  groups["_rev_"] = {rev:0,miles:0,fuel:0,svc:0,busDays:0};
 
-  enrichedCharter.forEach(function(r){
+  // Revenue: from Firm Bookings (StartDate as date, Total as revenue)
+  enrichedBk.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    if(!dateOk(r._tripDate)) return;
+    if(!opsPassTripTypeLoc(r)) return;
+    // Revenue goes to grand total only — bookings have no fleet group
+    if(groups["_ALL_"]) groups["_ALL_"].rev+=r._revenue;
+    // Distribute to all valid fleet groups proportionally later;
+    // for now accumulate in a temp bucket
+    if(!groups["_rev_"]) groups["_rev_"] = {rev:0,miles:0,fuel:0,svc:0,busDays:0};
+    groups["_rev_"].rev += r._revenue;
+  });
+  // Miles: from Samsara (vehicle_name → fleet group)
+  enrichedSamsara.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]) return;
     if(!dateOk(r._date)) return;
-    if(!opsPassTripTypeLoc(r)) return;
-    if(r._revenue) groups[g].rev+=r._revenue;
-    if(r._miles)   groups[g].miles+=r._miles;
+    if(r._miles) groups[g].miles+=r._miles;
   });
   enrichedUtil.forEach(function(r){
     var g=r._grp; if(!validFleet(g)||!groups[g]) return;
@@ -1408,15 +1411,25 @@ function buildOpsData(targetYr) {
     groups[g].svc+=r._cost;
   });
 
-  return Object.keys(groups).map(function(group){
+  // Distribute total booking revenue to fleet groups proportionally by their miles share
+  var totalRev = groups["_rev_"] ? groups["_rev_"].rev : 0;
+  var totalMiles = 0;
+  Object.keys(groups).forEach(function(g){
+    if(validFleet(g)) totalMiles += groups[g].miles;
+  });
+  delete groups["_rev_"];
+
+  return Object.keys(groups).filter(function(g){ return validFleet(g); }).map(function(group){
     var v=groups[group];
     var bd=Math.round(v.busDays*10)/10;
+    // Revenue attributed proportionally to this group's share of total miles
+    var revShare = totalMiles>0 ? (v.miles/totalMiles)*totalRev : 0;
     return {
       group:group,
-      revenue:Math.round(v.rev), miles:Math.round(v.miles),
+      revenue:Math.round(revShare), miles:Math.round(v.miles),
       fuel:Math.round(v.fuel), svc:Math.round(v.svc), busDays:bd,
-      rpm:v.miles>0?v.rev/v.miles:null, fpm:v.miles>0?v.fuel/v.miles:null, spm:v.miles>0?v.svc/v.miles:null,
-      rpd:bd>0?v.rev/bd:null, fpd:bd>0?v.fuel/bd:null, spd:bd>0?v.svc/bd:null
+      rpm:v.miles>0?revShare/v.miles:null, fpm:v.miles>0?v.fuel/v.miles:null, spm:v.miles>0?v.svc/v.miles:null,
+      rpd:bd>0?revShare/bd:null, fpd:bd>0?v.fuel/bd:null, spd:bd>0?v.svc/bd:null
     };
   }).sort(function(a,b){ return b.revenue-a.revenue; });
 }
@@ -1431,14 +1444,12 @@ function buildOpsDataByYear(fleetFilter) {
     return byYear[yr][grp];
   }
 
-  enrichedCharter.forEach(function(r){
+  enrichedSamsara.forEach(function(r){
     if(!r._date) return;
     var g=r._grp; if(!g||g==="Unknown") return;
     if(fleetFilter!=="all" && g!==fleetFilter) return;
     var yr=r._date.getFullYear();
-    var v=ensure(yr,g);
-    if(r._revenue) v.rev+=r._revenue;
-    if(r._miles) v.miles+=r._miles;
+    if(r._miles) ensure(yr,g).miles+=r._miles;
   });
   enrichedUtil.forEach(function(r){
     var g=r._grp; if(!g||g==="Unknown") return;
@@ -1583,15 +1594,24 @@ function buildOpsDataByMonth(fleetFilter, metric) {
     if(date.getFullYear() < CY) return true;
     return opsDatePassYTD(date);
   }
-  enrichedCharter.forEach(function(r){
+  // Revenue by month: from Firm Bookings (StartDate), no fleet group — stored globally per month
+  var bkRevByYrMo = {};
+  enrichedBk.forEach(function(r){
+    if(!r._tripDate||!r._revenue) return;
+    if(!opsByMonthDatePass(r._tripDate)) return;
+    if(!opsPassTripTypeLoc(r)) return;
+    var yr=r._tripDate.getFullYear(), mo=r._tripDate.getMonth();
+    var key=yr+"-"+mo;
+    bkRevByYrMo[key]=(bkRevByYrMo[key]||0)+r._revenue;
+  });
+  // Miles by month: from Samsara (vehicle_name → fleet group)
+  enrichedSamsara.forEach(function(r){
     if(!r._date||!opsByMonthDatePass(r._date)) return;
     var g=r._grp; if(!validFleet(g)) return;
     if(fleetFilter!=="all" && g!==fleetFilter) return;
-    if(!opsPassTripTypeLoc(r)) return;
     var yr=r._date.getFullYear(), mo=r._date.getMonth();
     var v=ensure(yr,mo);
-    if(r._revenue) v.rev+=r._revenue;
-    if(r._miles)   v.miles+=r._miles;
+    if(r._miles) v.miles+=r._miles;
   });
   enrichedUtil.forEach(function(r){
     var parts=r._dateKey.split("-");
@@ -1618,21 +1638,30 @@ function buildOpsDataByMonth(fleetFilter, metric) {
   });
 
   // Convert to 12-value arrays per year
-  // YTD/Booked: only show months up to today's month (same cutoff each year)
+  // Revenue is injected from bkRevByYrMo (total bookings per month, proportional to miles share)
   var result = {};
   Object.keys(byYrMo).forEach(function(yr){
     result[yr] = Array(12).fill(null);
     var cutoffMo = (+yr === CY) ? TODAY.getMonth() : 11;
+
+    // Compute total miles for this year (for proportional revenue allocation)
+    var totalMilesYr = 0;
+    for(var m2=0; m2<=cutoffMo; m2++){
+      var vm2=byYrMo[yr]&&byYrMo[yr][m2]; if(vm2) totalMilesYr+=vm2.miles;
+    }
+
     for(var mo=0; mo<12; mo++){
-      if(mo > cutoffMo) continue; // CY: YTD only; prior years: full 12 months
+      if(mo > cutoffMo) continue;
       var v = byYrMo[yr][mo];
       if(!v) continue;
       var bd = v.busDays;
+      // Revenue for this month from bookings, proportional to this month's miles share
+      var bkRevMo = bkRevByYrMo[yr+"-"+mo] || 0;
       var val = null;
-      if(metric==="rpm") val = v.miles>0 ? v.rev/v.miles : null;
+      if(metric==="rpm") val = v.miles>0 ? bkRevMo/v.miles : null;
       else if(metric==="fpm") val = v.miles>0 ? v.fuel/v.miles : null;
       else if(metric==="spm") val = v.miles>0 ? v.svc/v.miles : null;
-      else if(metric==="rpd") val = bd>0 ? v.rev/bd : null;
+      else if(metric==="rpd") val = bd>0 ? bkRevMo/bd : null;
       else if(metric==="fpd") val = bd>0 ? v.fuel/bd : null;
       else if(metric==="spd") val = bd>0 ? v.svc/bd : null;
       result[yr][mo] = val;
@@ -1704,7 +1733,7 @@ function renderInspector() {
     {name:"Fleet Assignments",count:Object.keys(DATA.fleet).length+" vehicles",keys:Object.keys(DATA.fleet).length?["Vehicle ID (key)"].concat(Object.keys(Object.values(DATA.fleet)[0]||{}).slice(0,6).map(function(k){return "Period "+k;})):[]},
     {name:"Fuel History",     count:DATA.fuel.length+" rows",       keys:DATA.fuel.length?Object.keys(DATA.fuel[0]):[]},
     {name:"Service History",  count:DATA.service.length+" rows",    keys:DATA.service.length?Object.keys(DATA.service[0]):[]},
-    {name:"Charter Revenue",    count:DATA.charter.length+" rows",  keys:DATA.charter.length?Object.keys(DATA.charter[0]):[]},
+    {name:"Samsara Miles",      count:(DATA.samsara||[]).length+" rows", keys:(DATA.samsara||[]).length?Object.keys(DATA.samsara[0]):[]},
     {name:"Vehicle Utilization",count:Object.keys((DATA.utilization&&DATA.utilization.hours)||{}).length+" vehicles", keys:Object.keys((DATA.utilization&&DATA.utilization.hours)||{}).length?["Col A = Date","Row 2 = Vehicle ID","Row 1 = Fleet Group","Values = Hours"]:[]},
     {name:"2026 Plan",count:Object.keys((DATA.plan&&DATA.plan.total)||{}).length+" months",keys:Object.keys((DATA.plan&&DATA.plan.total)||{}).length?["Col A=Year","Col B=Month","Row 1=Category","Row 2=Label","Values=Revenue"]:[]}
   ];
@@ -2237,7 +2266,7 @@ function finalizeResults(rawResults, fromCache, cacheTs) {
   DATA.fleet       = parseFleet(rawResults.fleet || []);
   DATA.fuel        = rawResults.fuel        || [];
   DATA.service     = rawResults.service     || [];
-  DATA.charter     = rawResults.charter     || [];
+  DATA.samsara     = rawResults.samsara     || [];
   DATA.utilization = parseUtilization(rawResults.utilization || []);
   DATA.plan        = parsePlan(rawResults.plan || []);
 
@@ -2269,9 +2298,9 @@ function fetchAllSources(onComplete, onProgress, silent) {
   var sources = [
     { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:false },
     { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments",   chunked:false },
-    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:true,  colEnd:"AM" },
-    { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:true,  colEnd:"BU" },
-    { key:"charter",     url:URLS.charter,     header:true,  label:"Charter Revenue",     chunked:false },
+    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:false },
+    { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:false },
+    { key:"samsara",     url:URLS.samsara,     header:true,  label:"Samsara Miles",        chunked:false },
     { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization", chunked:false },
     { key:"plan",        url:URLS.plan,        header:false, label:"2026 Plan",           chunked:false }
   ];
@@ -2389,7 +2418,7 @@ function runConnectionTest() {
     { label:"Fleet Assignments", url: URLS.fleet },
     { label:"Fuel History",      url: URLS.fuel },
     { label:"Service History",   url: URLS.service },
-    { label:"Charter Revenue",   url: URLS.charter }
+    { label:"Samsara Miles",     url: URLS.samsara }
   ];
 
   var proxies = [

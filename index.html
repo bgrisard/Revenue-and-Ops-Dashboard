@@ -471,15 +471,16 @@ function fetchChunkedCSV(url, colEnd, header, cb) {
         return;
       }
       var proxyUrl = proxies[pi++];
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", proxyUrl, true);
-      xhr.timeout = 40000;
-      xhr.onload = function() {
-        var txt = xhr.responseText || "";
-        if (xhr.status === 429) { pi--; setTimeout(tryProxy, 3000); return; }
-        if (xhr.status < 200 || xhr.status >= 300) { setTimeout(tryProxy, PROXY_DELAY); return; }
-        var fc = txt.trim().charAt(0);
-        if (fc === "<" || fc === "{" || fc === "[") { setTimeout(tryProxy, PROXY_DELAY); return; }
+      fetch(proxyUrl, { cache: "no-store" })
+        .then(function(res) {
+          if (!res.ok) { console.warn("fetchChunked HTTP " + res.status); setTimeout(tryProxy, PROXY_DELAY); return null; }
+          return res.text();
+        })
+        .then(function(txt) {
+          if (txt === null) return;
+          txt = txt || "";
+          var fc = txt.trim().charAt(0);
+          if (fc === "<" || fc === "{" || fc === "[") { setTimeout(tryProxy, PROXY_DELAY); return; }
 
         var parsed;
         if (chunkIdx === 0) {
@@ -526,10 +527,8 @@ function fetchChunkedCSV(url, colEnd, header, cb) {
         } else {
           setTimeout(fetchChunk, CHUNK_DELAY);
         }
-      };
-      xhr.onerror   = function() { console.warn("fetchChunked proxy error");   setTimeout(tryProxy, PROXY_DELAY); };
-      xhr.ontimeout = function() { console.warn("fetchChunked proxy timeout"); setTimeout(tryProxy, PROXY_DELAY); };
-      xhr.send();
+        })
+        .catch(function(err) { console.warn("fetchChunked proxy error:", err.message); setTimeout(tryProxy, PROXY_DELAY); });
     }
 
     tryProxy();
@@ -2285,11 +2284,11 @@ function finalizeResults(rawResults, fromCache, cacheTs) {
 // hammering allorigins with 7 simultaneous requests.
 function fetchAllSources(onComplete, onProgress, silent) {
   var sources = [
-    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:false },
+    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:true,  colEnd:"Z"  },
     { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments",   chunked:false },
-    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:false },
-    { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:false },
-    { key:"samsara",     url:URLS.samsara,     header:true,  label:"Samsara Miles",        chunked:false },
+    { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:true,  colEnd:"AM" },
+    { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:true,  colEnd:"BU" },
+    { key:"samsara",     url:URLS.samsara,     header:true,  label:"Samsara Miles",        chunked:true,  colEnd:"Z"  },
     { key:"utilization", url:URLS.utilization, header:false, label:"Vehicle Utilization", chunked:false },
     { key:"plan",        url:URLS.plan,        header:false, label:"2026 Plan",           chunked:false }
   ];

@@ -2284,7 +2284,7 @@ function finalizeResults(rawResults, fromCache, cacheTs) {
 // hammering allorigins with 7 simultaneous requests.
 function fetchAllSources(onComplete, onProgress, silent) {
   var sources = [
-    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:true,  colEnd:"Z"  },
+    { key:"bookings",    url:URLS.bookings,    header:true,  label:"Firm Bookings",       chunked:true,  colEnd:"BQ" },
     { key:"fleet",       url:URLS.fleet,       header:false, label:"Fleet Assignments",   chunked:false },
     { key:"fuel",        url:URLS.fuel,        header:true,  label:"Fuel History",        chunked:true,  colEnd:"AM" },
     { key:"service",     url:URLS.service,     header:true,  label:"Service History",     chunked:true,  colEnd:"BU" },

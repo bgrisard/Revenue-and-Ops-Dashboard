@@ -418,7 +418,7 @@ function fetchCSV(url, header, cb) {
 // Stops when a chunk returns 0 rows OR fewer than CHUNK_SIZE rows.
 // Each chunk is retried across multiple proxies before giving up.
 function fetchChunkedCSV(url, colEnd, header, cb) {
-  var CHUNK_SIZE  = 3000;  // rows per request — allorigins handles up to ~2MB fine
+  var CHUNK_SIZE  = 500;   // rows per request — reduced for wide sheets (BQ columns)
   var PROXY_DELAY = 200;   // ms between proxy attempts within a chunk
   var CHUNK_DELAY = 300;   // ms between consecutive chunks (avoids rate limiting)
   var allRows     = [];

@@ -373,49 +373,39 @@ function isValidCSV(txt, header) {
 
 function fetchCSV(url, header, cb) {
   var shortLabel = url.split("PACX")[1] ? ("PACX"+url.split("PACX")[1]).slice(0,20) : url.slice(50,70);
-
-  // allorigins has no size limit and handles Google's redirects well — use it first.
-  // codetabs is fast but caps at ~1MB (truncates large sheets) — use as fallback only.
-  var proxies = [
-    { name:"direct",     url: url },
-    { name:"corsproxy",  url:"https://corsproxy.io/?" + encodeURIComponent(url) },
-    { name:"allorigins", url:"https://api.allorigins.win/raw?url=" + encodeURIComponent(url) },
-    { name:"thingproxy", url:"https://thingproxy.freeboard.io/fetch/" + url }
+  var proxyFns = [
+    function(u){ return "https://corsproxy.io/?" + encodeURIComponent(u); },
+    function(u){ return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); },
+    function(u){ return "https://thingproxy.freeboard.io/fetch/" + u; }
   ];
+  var proxyNames = ["corsproxy","allorigins","thingproxy"];
   var idx = 0;
 
-  function tryNext(retryDelay) {
-    if (idx >= proxies.length) {
+  function tryNext() {
+    if (idx >= proxyFns.length) {
       console.error("All proxies failed for:", shortLabel);
       cb(header ? [] : []);
       return;
     }
-    var proxy = proxies[idx++];
-    setTimeout(function() {
-      console.log("Trying " + proxy.name + " for " + shortLabel);
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", proxy.url, true);
-      xhr.timeout = 35000;
-      xhr.onload = function() {
-        var txt = xhr.responseText;
-        console.log(proxy.name, "status:", xhr.status, "bytes:", txt ? txt.length : 0, "rows~:", txt ? txt.split("\n").length : 0);
-        if (xhr.status === 429) {
-          console.warn(proxy.name + " rate limited, waiting 3s…");
-          idx--;
-          tryNext(3000);
-        } else if (xhr.status >= 200 && xhr.status < 300 && isValidCSV(txt, header)) {
-          var result = Papa.parse(txt, { header: header, skipEmptyLines: true });
-          console.log("SUCCESS via " + proxy.name + ":", result.data.length, "rows for", shortLabel);
-          cb(result.data);
-        } else {
-          console.warn(proxy.name + " failed (status:" + xhr.status + "), trying next");
-          tryNext(0);
-        }
-      };
-      xhr.onerror   = function() { console.warn(proxy.name + " network error"); tryNext(0); };
-      xhr.ontimeout = function() { console.warn(proxy.name + " timed out");     tryNext(0); };
-      xhr.send();
-    }, retryDelay || 0);
+    var i = idx++;
+    var proxyUrl = proxyFns[i](url);
+    console.log("Trying " + proxyNames[i] + " for " + shortLabel);
+    fetch(proxyUrl, { cache: "no-store" })
+      .then(function(res) {
+        if (!res.ok) { console.warn(proxyNames[i] + " HTTP " + res.status); tryNext(); return null; }
+        return res.text();
+      })
+      .then(function(txt) {
+        if (txt === null) return;
+        if (!isValidCSV(txt, header)) { console.warn(proxyNames[i] + " invalid CSV"); tryNext(); return; }
+        var result = Papa.parse(txt, { header: header, skipEmptyLines: true });
+        console.log("SUCCESS via " + proxyNames[i] + ":", result.data.length, "rows for", shortLabel);
+        cb(result.data);
+      })
+      .catch(function(err) {
+        console.warn(proxyNames[i] + " error:", err.message);
+        tryNext();
+      });
   }
 
   tryNext();
@@ -436,10 +426,9 @@ function fetchChunkedCSV(url, colEnd, header, cb) {
 
   function buildProxies(rangeUrl) {
     return [
-      rangeUrl,
-      "https://corsproxy.io/?"                 + encodeURIComponent(rangeUrl),
-      "https://api.allorigins.win/raw?url="    + encodeURIComponent(rangeUrl),
-      "https://thingproxy.freeboard.io/fetch/" + rangeUrl
+      "https://corsproxy.io/?"                         + encodeURIComponent(rangeUrl),
+      "https://api.allorigins.win/raw?url="            + encodeURIComponent(rangeUrl),
+      "https://thingproxy.freeboard.io/fetch/"         + rangeUrl
     ];
   }
 
